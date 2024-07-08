@@ -18,7 +18,7 @@ WordWizard 是一个创新的背单词应用程序，旨在通过生成荒谬而
 
 ### 克隆仓库
 ```bash
-git clone https://github.com/Tom-dev54/WordWizard.git
+git clone https://github.com/你的用户名/WordWizard.git
 cd WordWizard
 
 创建虚拟环境并安装依赖
@@ -32,8 +32,12 @@ SPARKAI_APP_ID=你的APP_ID
 SPARKAI_API_KEY=你的API_KEY
 SPARKAI_API_SECRET=你的API_SECRET
 
+使用指南
 运行应用
 python app.py
+
+交互界面
+在浏览器中打开 http://127.0.0.1:7860 访问 Gradio 提供的用户界面。
 
 生成故事和图片
 1.输入你想要记忆的单词（建议输入30个单词）。
