@@ -7,12 +7,16 @@ import random
 import os
 import asyncio
 import time
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 # 配置
 config = Config(
-    appid='1c0da03d',
-    apikey='978389db44075a8e686369a5a0a76ab3',
-    apisecret='ZDUyMGI0NDcxZmZjZjQ0MjU0ZGQxMTQ1'
+    appid=os.getenv('SPARKAI_APP_ID'),
+    apikey=os.getenv('SPARKAI_API_KEY'),
+    apisecret=os.getenv('SPARKAI_API_SECRET')
 )
 
 # 初始化模型
