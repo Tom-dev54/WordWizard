@@ -169,6 +169,22 @@ export const ZODIAC_SIGNS = [
   },
 ]
 
+// Extended data: fortune scores + personality archetypes for three-pillar analysis
+export const ZODIAC_EXTENDED = {
+  aries:       { fortuneScores: { love: 72, career: 88, wealth: 70, social: 82 }, sunTag: '先锋者',     moonTag: '冲动型感性', risingTag: '活力四射' },
+  taurus:      { fortuneScores: { love: 88, career: 80, wealth: 92, social: 75 }, sunTag: '享乐主义者', moonTag: '安全感渴望', risingTag: '稳重可靠' },
+  gemini:      { fortuneScores: { love: 75, career: 85, wealth: 72, social: 92 }, sunTag: '话题制造机', moonTag: '情绪多变型', risingTag: '八面玲珑' },
+  cancer:      { fortuneScores: { love: 92, career: 72, wealth: 68, social: 80 }, sunTag: '温柔守护者', moonTag: '敏感共情者', risingTag: '温暖近人' },
+  leo:         { fortuneScores: { love: 85, career: 90, wealth: 80, social: 90 }, sunTag: '舞台中央控', moonTag: '荣耀心强型', risingTag: '自信光芒' },
+  virgo:       { fortuneScores: { love: 70, career: 88, wealth: 82, social: 72 }, sunTag: '完美主义者', moonTag: '思虑过多型', risingTag: '低调谨慎' },
+  libra:       { fortuneScores: { love: 90, career: 78, wealth: 75, social: 95 }, sunTag: '平衡大师',   moonTag: '选择困难症', risingTag: '优雅迷人' },
+  scorpio:     { fortuneScores: { love: 88, career: 85, wealth: 80, social: 70 }, sunTag: '侦探本能',   moonTag: '情绪深水区', risingTag: '神秘磁场' },
+  sagittarius: { fortuneScores: { love: 78, career: 82, wealth: 72, social: 90 }, sunTag: '自由灵魂',   moonTag: '无忧乐观派', risingTag: '开朗直率' },
+  capricorn:   { fortuneScores: { love: 72, career: 92, wealth: 90, social: 75 }, sunTag: '攀登者',     moonTag: '现实主义者', risingTag: '成熟稳重' },
+  aquarius:    { fortuneScores: { love: 72, career: 85, wealth: 70, social: 88 }, sunTag: '独立思想家', moonTag: '理性情感型', risingTag: '特立独行' },
+  pisces:      { fortuneScores: { love: 90, career: 70, wealth: 65, social: 85 }, sunTag: '灵性漫游者', moonTag: '共情达人',   risingTag: '温柔梦幻' },
+}
+
 export function getZodiacByDate(month, day) {
   const m = parseInt(month), d = parseInt(day)
   if ((m === 3 && d >= 21) || (m === 4 && d <= 19)) return 'aries'
