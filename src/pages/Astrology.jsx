@@ -5,6 +5,10 @@ import {
   ELEMENT_COLORS, DAY_MASTER_DESC, getBazi, getElementBalance, getDaYun,
 } from '../data/baziData'
 import { getUserBirth, saveUserBirth } from '../utils/storage'
+import { isPremium } from '../utils/premium'
+import { getAIReading, buildAstrologyPrompt } from '../utils/deepseek'
+import PremiumGate from '../components/PremiumGate'
+import PremiumSheet from '../components/PremiumSheet'
 import { tap } from '../utils/haptics'
 
 const SIGN_ORDER = ['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces']
@@ -385,7 +389,32 @@ const SIGN_DAILY_MSGS = {
   pisces: ['直觉是今日最可靠的指南针，先感受，再思考。', '艺术或自然能帮你恢复能量，给自己留一段独处时光。'],
 }
 
-function FortuneTab({ sunSign }) {
+function FortuneTab({ sunSign, moonSign, risingSign, premium, onUpgrade }) {
+  const [aiGuide, setAiGuide] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+
+  async function handleAIGuide() {
+    if (!premium) { onUpgrade?.(); return }
+    setAiLoading(true)
+    try {
+      const today = new Date()
+      const scores = {
+        love: dailyScore(sunSign.id, 'love', today),
+        career: dailyScore(sunSign.id, 'career', today),
+        wealth: dailyScore(sunSign.id, 'wealth', today),
+        social: dailyScore(sunSign.id, 'social', today),
+      }
+      const prompt = buildAstrologyPrompt({
+        sunSign: sunSign.name, moonSign: moonSign?.name, risingSign: risingSign?.name, scores,
+      })
+      const result = await getAIReading(prompt)
+      setAiGuide(result)
+    } catch {
+      setAiGuide('✦ 星光稍有遮蔽，请稍后再试')
+    }
+    setAiLoading(false)
+  }
+
   if (!sunSign) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 20px' }}>
@@ -475,7 +504,7 @@ function FortuneTab({ sunSign }) {
         </div>
       </div>
 
-      <div className="card-soft" style={{ padding: 16 }}>
+      <div className="card-soft" style={{ padding: 16, marginBottom: 14 }}>
         <p className="section-sub" style={{ marginBottom: 12 }}>本周能量走势</p>
         <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 56 }}>
           {['一','二','三','四','五','六','日'].map((d, i) => {
@@ -493,6 +522,43 @@ function FortuneTab({ sunSign }) {
             )
           })}
         </div>
+      </div>
+
+      {/* AI Guide */}
+      <div className="card-soft" style={{
+        padding: 16,
+        background: premium ? 'linear-gradient(135deg, rgba(196,146,74,0.08), #ffffff)' : '#fefcf6',
+        borderLeft: '3px solid #c9973a',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <p style={{ fontSize: 12, color: '#c4924a', fontWeight: 600 }}>✨ AI 今日星盘指引</p>
+          {!aiGuide && (
+            <button
+              onClick={handleAIGuide}
+              disabled={aiLoading}
+              style={{
+                background: premium
+                  ? 'linear-gradient(135deg, #c9973a, #e8c06a)'
+                  : 'rgba(196,146,74,0.15)',
+                border: 'none', borderRadius: 999, padding: '5px 12px',
+                color: premium ? '#fff' : '#c4924a',
+                fontSize: 11, cursor: 'pointer', opacity: aiLoading ? 0.6 : 1,
+              }}
+            >
+              {aiLoading ? '解读中…' : premium ? '生成指引' : '🔒 会员'}
+            </button>
+          )}
+        </div>
+        {aiLoading && (
+          <p style={{ fontSize: 12, color: '#c4924a', animation: 'pulse-soft 1.5s ease-in-out infinite' }}>✦ 星光汇聚中…</p>
+        )}
+        {aiGuide ? (
+          <p className="animate-fade-up" style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9 }}>{aiGuide}</p>
+        ) : (
+          <p style={{ fontSize: 12, color: '#8a7a5e' }}>
+            {premium ? '点击右侧按钮，获取今日个性化星盘指引' : '升级会员，解锁 AI 深度星盘解读'}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -655,6 +721,171 @@ function BaziTab({ year, month, day, hour }) {
   )
 }
 
+// ── Tab: 星座配对 (Compatibility) ────────────────────────────────────────
+
+const COMPAT_SCORES = {
+  aries:       { taurus:60, gemini:85, cancer:55, leo:92, virgo:62, libra:78, scorpio:70, sagittarius:90, capricorn:58, aquarius:80, pisces:65, aries:75 },
+  taurus:      { aries:60, gemini:65, cancer:90, leo:72, virgo:95, libra:68, scorpio:75, sagittarius:58, capricorn:92, aquarius:62, pisces:82, taurus:70 },
+  gemini:      { aries:85, taurus:65, cancer:68, leo:80, virgo:70, libra:92, scorpio:60, sagittarius:85, capricorn:65, aquarius:90, pisces:72, gemini:75 },
+  cancer:      { aries:55, taurus:90, gemini:68, leo:72, virgo:78, libra:65, scorpio:90, sagittarius:62, capricorn:75, aquarius:60, pisces:92, cancer:70 },
+  leo:         { aries:92, taurus:72, gemini:80, cancer:72, virgo:68, libra:85, scorpio:75, sagittarius:90, capricorn:65, aquarius:72, pisces:68, leo:75 },
+  virgo:       { aries:62, taurus:95, gemini:70, cancer:78, leo:68, libra:75, scorpio:82, sagittarius:60, capricorn:90, aquarius:68, pisces:70, virgo:72 },
+  libra:       { aries:78, taurus:68, gemini:92, cancer:65, leo:85, virgo:75, scorpio:72, sagittarius:82, capricorn:70, aquarius:88, pisces:75, libra:78 },
+  scorpio:     { aries:70, taurus:75, gemini:60, cancer:90, leo:75, virgo:82, libra:72, sagittarius:65, capricorn:80, aquarius:65, pisces:92, scorpio:75 },
+  sagittarius: { aries:90, taurus:58, gemini:85, cancer:62, leo:90, virgo:60, libra:82, scorpio:65, capricorn:72, aquarius:85, pisces:70, sagittarius:75 },
+  capricorn:   { aries:58, taurus:92, gemini:65, cancer:75, leo:65, virgo:90, libra:70, scorpio:80, sagittarius:72, aquarius:70, pisces:78, capricorn:72 },
+  aquarius:    { aries:80, taurus:62, gemini:90, cancer:60, leo:72, virgo:68, libra:88, scorpio:65, sagittarius:85, capricorn:70, pisces:72, aquarius:75 },
+  pisces:      { aries:65, taurus:82, gemini:72, cancer:92, leo:68, virgo:70, libra:75, scorpio:92, sagittarius:70, capricorn:78, aquarius:72, pisces:78 },
+}
+
+const COMPAT_DIMS = ['love', 'comm', 'values', 'passion']
+const COMPAT_DIM_LABELS = { love: '爱情', comm: '沟通', values: '价值观', passion: '激情' }
+const COMPAT_DIM_COLORS = { love: '#c44a5e', comm: '#2d4a3e', values: '#c4924a', passion: '#7a3e6c' }
+
+function getCompatDimScores(base) {
+  return {
+    love: Math.min(99, base + (base % 7) - 3),
+    comm: Math.min(99, base - (base % 5) + 2),
+    values: Math.min(99, base + (base % 11) - 5),
+    passion: Math.min(99, base - (base % 13) + 4),
+  }
+}
+
+function CompatTab({ sunSignId }) {
+  const [partnerMonth, setPartnerMonth] = useState('')
+  const [partnerDay, setPartnerDay] = useState('')
+  const [result, setResult] = useState(null)
+
+  const inputStyle = {
+    width: '100%', padding: '12px 12px',
+    background: '#fff', border: '1px solid rgba(196,146,74,0.25)',
+    borderRadius: 12, color: '#2d2618', fontSize: 15,
+  }
+
+  function handleCheck() {
+    tap()
+    if (!partnerMonth || !partnerDay) return
+    const partnerId = getZodiacByDate(partnerMonth, partnerDay)
+    const mySign = SIGNS.find(s => s.id === sunSignId)
+    const partnerSign = SIGNS.find(s => s.id === partnerId)
+    const base = COMPAT_SCORES[sunSignId]?.[partnerId] || 72
+    const dims = getCompatDimScores(base)
+    setResult({ mySign, partnerSign, base, dims })
+  }
+
+  if (!sunSignId) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+        <p style={{ fontSize: 36, marginBottom: 12 }}>💫</p>
+        <p className="serif" style={{ fontSize: 16, color: '#2d2618', marginBottom: 8 }}>请先输入你的生日</p>
+        <p style={{ fontSize: 12, color: '#8a7a5e' }}>在上方表单填写月份和日期，解析你的太阳星座</p>
+      </div>
+    )
+  }
+
+  const mySelf = SIGNS.find(s => s.id === sunSignId)
+
+  return (
+    <div className="animate-fade-up">
+      <div className="card-soft" style={{ padding: 18, marginBottom: 14 }}>
+        <p className="section-sub" style={{ marginBottom: 14 }}>COMPATIBILITY · 星座配对</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+            background: `${ELCOL[mySelf?.element]}20`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
+          }}>{mySelf?.symbol}</div>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 20, color: '#c4924a' }}>♡</div>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', flexShrink: 0, background: '#f0e8d6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>
+            {result ? result.partnerSign?.symbol : '?'}
+          </div>
+        </div>
+        <p style={{ fontSize: 12, color: '#5a4a3a', marginBottom: 12 }}>输入TA的生日</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+          <label>
+            <span style={{ fontSize: 10, color: '#8a7a5e', display: 'block', marginBottom: 5 }}>月份</span>
+            <input type="number" min="1" max="12" value={partnerMonth} onChange={e => setPartnerMonth(e.target.value)} placeholder="1–12" style={inputStyle} />
+          </label>
+          <label>
+            <span style={{ fontSize: 10, color: '#8a7a5e', display: 'block', marginBottom: 5 }}>日期</span>
+            <input type="number" min="1" max="31" value={partnerDay} onChange={e => setPartnerDay(e.target.value)} placeholder="1–31" style={inputStyle} />
+          </label>
+        </div>
+        <button
+          onClick={handleCheck}
+          className="btn-primary"
+          style={{ width: '100%', opacity: (partnerMonth && partnerDay) ? 1 : 0.45 }}
+          disabled={!partnerMonth || !partnerDay}
+        >
+          ♡ 测试缘分
+        </button>
+      </div>
+
+      {result && (
+        <div className="animate-fade-up">
+          <div className="card-soft" style={{
+            padding: 20, marginBottom: 14,
+            background: `linear-gradient(135deg, ${ELCOL[result.mySign?.element]}08, ${ELCOL[result.partnerSign?.element]}08)`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 32 }}>{result.mySign?.symbol}</div>
+                <p style={{ fontSize: 12, color: '#2d2618', fontWeight: 500 }}>{result.mySign?.name}</p>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div className="serif" style={{
+                  fontSize: 36, color: '#c4924a',
+                  lineHeight: 1, marginBottom: 4,
+                }}>{result.base}</div>
+                <div style={{
+                  fontSize: 9, background: result.base >= 85 ? '#c4924a' : result.base >= 70 ? '#2d4a3e' : '#8a7a5e',
+                  color: '#fff', padding: '2px 8px', borderRadius: 999,
+                }}>
+                  {result.base >= 85 ? '天作之合' : result.base >= 70 ? '相当契合' : result.base >= 55 ? '潜力匹配' : '需要磨合'}
+                </div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 32 }}>{result.partnerSign?.symbol}</div>
+                <p style={{ fontSize: 12, color: '#2d2618', fontWeight: 500 }}>{result.partnerSign?.name}</p>
+              </div>
+            </div>
+
+            {COMPAT_DIMS.map(dim => {
+              const score = result.dims[dim]
+              const color = COMPAT_DIM_COLORS[dim]
+              return (
+                <div key={dim} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, color: '#5a4a3a' }}>{COMPAT_DIM_LABELS[dim]}</span>
+                    <span style={{ fontSize: 12, color, fontWeight: 600 }}>{score}</span>
+                  </div>
+                  <div style={{ height: 6, background: '#f0e8d6', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', width: `${score}%`,
+                      background: `linear-gradient(90deg, ${color}80, ${color})`,
+                      borderRadius: 3, transition: 'width 0.8s ease-out',
+                    }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="card-soft" style={{ padding: 16, borderLeft: '3px solid #c4924a' }}>
+            <p style={{ fontSize: 11, color: '#c4924a', marginBottom: 6, fontWeight: 600 }}>✦ 缘分解读</p>
+            <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9 }}>
+              {result.mySign?.name}与{result.partnerSign?.name}的组合综合匹配度{result.base}分。
+              {result.base >= 85 ? `这对组合在能量频率上高度共鸣，${result.mySign?.element}与${result.partnerSign?.element}相互滋养，感情基础稳固。` :
+               result.base >= 70 ? `两人性格互补，在沟通和价值观上有较多共鸣，需要彼此多一些理解和包容。` :
+               `两人性格差异明显，但差异也是成长的机会。只要双方愿意努力，感情可以磨出独特的火花。`}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Component ──────────────────────────────────────────────────────
 
 export default function Astrology() {
@@ -707,10 +938,14 @@ export default function Astrology() {
     })
   }
 
+  const [showPremium, setShowPremium] = useState(false)
+  const [premium] = useState(isPremium)
+
   const TABS = [
     { id: 'zodiac', label: '星座分析' },
     { id: 'fortune', label: '今日运势' },
     { id: 'bazi', label: '八字速览' },
+    { id: 'compat', label: '⭐ 配对' },
   ]
 
   const inputStyle = {
@@ -774,10 +1009,24 @@ export default function Astrology() {
       {tab === 'zodiac' && (
         <ZodiacTab sunSign={sunSign} moonSign={moonSign} risingSign={risingSign} browsing={browsing} setBrowsing={setBrowsing} />
       )}
-      {tab === 'fortune' && <FortuneTab sunSign={sunSign} />}
+      {tab === 'fortune' && (
+        <FortuneTab
+          sunSign={sunSign} moonSign={moonSign} risingSign={risingSign}
+          premium={premium} onUpgrade={() => setShowPremium(true)}
+        />
+      )}
       {tab === 'bazi' && <BaziTab year={year} month={month} day={day} hour={hour} />}
+      {tab === 'compat' && (
+        <PremiumGate feature="星座配对分析 · 四维度匹配">
+          <CompatTab sunSignId={sunSignId} />
+        </PremiumGate>
+      )}
 
       <div style={{ height: 60 }} />
+
+      {showPremium && (
+        <PremiumSheet onClose={() => setShowPremium(false)} />
+      )}
     </div>
   )
 }

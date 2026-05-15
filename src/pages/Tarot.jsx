@@ -1,9 +1,15 @@
 import { useState } from 'react'
 import { MAJOR_ARCANA, SPREADS } from '../data/tarotCards'
+import { PREMIUM_SPREADS } from '../data/premiumSpreads'
 import { CardFace, CardBack } from '../components/TarotCardArt'
 import { saveReading, getJournal, deleteReading } from '../utils/storage'
+import { isPremium } from '../utils/premium'
+import { getAIReading, buildTarotPrompt } from '../utils/deepseek'
 import Sheet from '../components/Sheet'
+import PremiumSheet from '../components/PremiumSheet'
 import { impact, tap, success } from '../utils/haptics'
+
+const ALL_SPREADS = [...SPREADS, ...PREMIUM_SPREADS]
 
 function drawCards(count) {
   const shuffled = [...MAJOR_ARCANA].sort(() => Math.random() - 0.5)
@@ -137,6 +143,12 @@ function SaveJournalSheet({ spread, cards, onClose, onSaved }) {
     <Sheet onClose={onClose}>
       {(dismiss) => {
         function handleSave() {
+          const journal = getJournal()
+          if (journal.length >= 10 && !isPremium()) {
+            dismiss()
+            onSaved('limit')
+            return
+          }
           saveReading({
             type: 'spread',
             spreadName: spread.name,
@@ -346,12 +358,31 @@ export default function Tarot() {
   const [detail, setDetail] = useState(null)
   const [showSave, setShowSave] = useState(false)
   const [savedToast, setSavedToast] = useState(false)
+  const [showPremium, setShowPremium] = useState(false)
+  const [aiReading, setAiReading] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [premium, setPremium] = useState(isPremium)
 
   function startSpread(s) {
+    if (s.premium && !premium) { tap(); setShowPremium(true); return }
     setSpread(s)
     setPhase('shuffle')
     setDrawn([])
     setFlipped([])
+    setAiReading('')
+  }
+
+  async function handleAIReading(cards, question) {
+    if (!premium) { setShowPremium(true); return }
+    setAiLoading(true)
+    try {
+      const prompt = buildTarotPrompt({ spreadName: spread.name, cards, question: question || '' })
+      const result = await getAIReading(prompt)
+      setAiReading(result)
+    } catch {
+      setAiReading('✦ 星光稍有遮蔽，请稍后再试')
+    }
+    setAiLoading(false)
   }
 
   function handleDraw() {
@@ -373,7 +404,11 @@ export default function Tarot() {
     setFlipped([])
   }
 
-  function handleSaved() {
+  function handleSaved(reason) {
+    if (reason === 'limit') {
+      setShowPremium(true)
+      return
+    }
     setSavedToast(true)
     setTimeout(() => setSavedToast(false), 2000)
   }
@@ -415,39 +450,58 @@ export default function Tarot() {
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {SPREADS.map(s => (
-              <button
-                key={s.id}
-                onClick={() => startSpread(s)}
-                className="card-soft"
-                style={{
-                  padding: 18, cursor: 'pointer',
-                  border: 'none', textAlign: 'left',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  background: '#ffffff', transition: 'transform 0.15s ease',
-                }}
-                onTouchStart={e => e.currentTarget.style.transform = 'scale(0.98)'}
-                onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                <div>
-                  <p className="serif" style={{ fontSize: 17, color: '#2d2618', marginBottom: 4 }}>{s.name}</p>
-                  <p style={{ fontSize: 12, color: '#8a7a5e' }}>{s.desc}</p>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                    {s.positions.map(p => (
-                      <span key={p} className="pill pill-cream" style={{ fontSize: 10 }}>{p}</span>
-                    ))}
+            {ALL_SPREADS.map(s => {
+              const locked = s.premium && !premium
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => startSpread(s)}
+                  className="card-soft"
+                  style={{
+                    padding: 18, cursor: 'pointer',
+                    border: locked ? '1px solid rgba(196,146,74,0.3)' : 'none',
+                    textAlign: 'left',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: locked ? 'linear-gradient(135deg, #fffbf0, #faf4e8)' : '#ffffff',
+                    transition: 'transform 0.15s ease',
+                  }}
+                  onTouchStart={e => e.currentTarget.style.transform = 'scale(0.98)'}
+                  onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <p className="serif" style={{ fontSize: 17, color: '#2d2618' }}>{s.name}</p>
+                      {locked && (
+                        <span style={{
+                          fontSize: 9, padding: '2px 7px', borderRadius: 999,
+                          background: 'linear-gradient(135deg, #c9973a, #e8c06a)',
+                          color: '#fff', fontWeight: 600,
+                        }}>✦ 会员</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 12, color: '#8a7a5e' }}>{s.desc}</p>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                      {s.positions.slice(0, 4).map(p => (
+                        <span key={p} className="pill pill-cream" style={{ fontSize: 10 }}>{p}</span>
+                      ))}
+                      {s.positions.length > 4 && (
+                        <span className="pill pill-cream" style={{ fontSize: 10 }}>+{s.positions.length - 4}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12,
-                  background: 'linear-gradient(135deg, #2d4a3e, #1f3329)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#c4924a', fontSize: 16, flexShrink: 0,
-                }}>
-                  {s.count}
-                </div>
-              </button>
-            ))}
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: locked
+                      ? 'linear-gradient(135deg, #c9973a, #e8c06a)'
+                      : 'linear-gradient(135deg, #2d4a3e, #1f3329)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: locked ? 18 : 16, flexShrink: 0,
+                  }}>
+                    {locked ? '🔒' : s.count}
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -565,7 +619,71 @@ export default function Tarot() {
                 </button>
               ))}
 
-              <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              {/* AI Reading section */}
+              {premium && (
+                <div className="card-soft" style={{
+                  padding: 16, marginTop: 14,
+                  background: 'linear-gradient(135deg, rgba(196,146,74,0.08), #ffffff)',
+                  borderLeft: '3px solid #c9973a',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <p style={{ fontSize: 12, color: '#c4924a', fontWeight: 600 }}>✨ AI 深度解读</p>
+                    {!aiReading && (
+                      <button
+                        onClick={() => handleAIReading(drawn.map((d, i) => ({ cardName: d.card.nameCN, reversed: d.reversed, position: spread.positions[i] })))}
+                        disabled={aiLoading}
+                        style={{
+                          background: 'linear-gradient(135deg, #c9973a, #e8c06a)',
+                          border: 'none', borderRadius: 999, padding: '6px 14px',
+                          color: '#fff', fontSize: 12, cursor: aiLoading ? 'wait' : 'pointer',
+                          opacity: aiLoading ? 0.7 : 1,
+                        }}
+                      >
+                        {aiLoading ? '解读中…' : '生成解读'}
+                      </button>
+                    )}
+                  </div>
+                  {aiLoading && (
+                    <div style={{ textAlign: 'center', padding: '12px 0', color: '#c4924a', animation: 'pulse-soft 1.5s ease-in-out infinite' }}>
+                      ✦ 星光汇聚中…
+                    </div>
+                  )}
+                  {aiReading && (
+                    <p className="animate-fade-up" style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9 }}>
+                      {aiReading}
+                    </p>
+                  )}
+                  {!aiLoading && !aiReading && (
+                    <p style={{ fontSize: 12, color: '#8a7a5e' }}>点击右侧按钮，获取专属AI综合解读</p>
+                  )}
+                </div>
+              )}
+
+              {!premium && (
+                <button
+                  onClick={() => setShowPremium(true)}
+                  className="card-soft"
+                  style={{
+                    width: '100%', padding: 14, marginTop: 14,
+                    border: '1px solid rgba(196,146,74,0.3)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: 'linear-gradient(135deg, rgba(196,146,74,0.06), #fefcf6)',
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>✨</span>
+                  <div style={{ flex: 1, textAlign: 'left' }}>
+                    <p style={{ fontSize: 13, color: '#2d2618', fontWeight: 500 }}>AI 深度解读</p>
+                    <p style={{ fontSize: 11, color: '#8a7a5e' }}>会员专属 · DeepSeek 个性化综合解析</p>
+                  </div>
+                  <span style={{
+                    fontSize: 9, padding: '3px 8px', borderRadius: 999,
+                    background: 'linear-gradient(135deg, #c9973a, #e8c06a)',
+                    color: '#fff', fontWeight: 600,
+                  }}>✦ 会员</span>
+                </button>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
                 <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowSave(true)}>
                   ✦ 记入日志
                 </button>
@@ -586,6 +704,12 @@ export default function Tarot() {
           spread={spread} cards={drawn}
           onClose={() => setShowSave(false)}
           onSaved={handleSaved}
+        />
+      )}
+      {showPremium && (
+        <PremiumSheet
+          onClose={() => setShowPremium(false)}
+          onActivated={() => { setPremium(true); setShowPremium(false) }}
         />
       )}
       {savedToast && (

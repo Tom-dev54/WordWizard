@@ -51,8 +51,16 @@ function PeopleIcon({ active }) {
   )
 }
 
+import { useState } from 'react'
+import { isPremium } from '../utils/premium'
+import PremiumSheet from './PremiumSheet'
+
 export default function Navigation({ current, onNavigate }) {
+  const [showPremium, setShowPremium] = useState(false)
+  const premium = isPremium()
+
   return (
+    <>
     <nav
       style={{
         position: 'fixed',
@@ -67,6 +75,30 @@ export default function Navigation({ current, onNavigate }) {
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
+      {!premium && (
+        <button
+          onClick={() => setShowPremium(true)}
+          style={{
+            position: 'absolute', top: -16, right: 12,
+            background: 'linear-gradient(135deg, #c9973a, #e8c06a)',
+            border: 'none', borderRadius: 999,
+            padding: '4px 12px', cursor: 'pointer',
+            color: '#fff', fontSize: 11, fontWeight: 600,
+            boxShadow: '0 2px 10px rgba(196,146,74,0.4)',
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}
+        >
+          ✦ 升级会员
+        </button>
+      )}
+      {premium && (
+        <div style={{
+          position: 'absolute', top: -14, right: 12,
+          background: 'linear-gradient(135deg, #c9973a, #e8c06a)',
+          borderRadius: 999, padding: '3px 10px',
+          color: '#fff', fontSize: 10, fontWeight: 600,
+        }}>✦ 会员</div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-around', padding: '8px 4px 4px' }}>
         {NAV_ITEMS.map(item => {
           const active = current === item.id
@@ -118,5 +150,7 @@ export default function Navigation({ current, onNavigate }) {
         })}
       </div>
     </nav>
+    {showPremium && <PremiumSheet onClose={() => setShowPremium(false)} />}
+    </>
   )
 }
