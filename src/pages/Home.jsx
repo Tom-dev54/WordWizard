@@ -1,233 +1,292 @@
 import { useState, useEffect } from 'react'
+import { MAJOR_ARCANA } from '../data/tarotCards'
+import { CardFace, CardBack } from '../components/TarotCardArt'
+import Mascot from '../components/Mascot'
+import { getJournal, getUser, saveReading, relTime } from '../utils/storage'
 
-const DAILY_MESSAGES = [
+const DAILY_QUOTES = [
   '宇宙正在为你对齐最完美的能量频率',
   '今天是一个播种意图的好日子，想清楚你真正渴望的是什么',
   '内心的声音比任何预言都更准确，请倾听它',
   '你所寻找的，也在寻找你',
-  '星辰已经为你铺好了道路，相信自己，迈步前行',
+  '星辰已经为你铺好了道路，迈步前行',
   '今日的挑战是明日智慧的来源，请勇敢经历',
   '放下控制，宇宙自有安排',
 ]
 
-const DAILY_CARDS = ['愚者', '魔法师', '女祭司', '女皇', '力量', '星星', '太阳']
-const CARD_SYMBOLS = ['🌟', '⚡', '🌙', '🌸', '🦁', '✨', '☀']
+const MOON_PHASES = [
+  { icon: '🌑', name: '新月',   hint: '播种新的意图与心愿' },
+  { icon: '🌒', name: '峨眉月', hint: '酝酿你的计划' },
+  { icon: '🌓', name: '上弦月', hint: '采取行动的好时机' },
+  { icon: '🌔', name: '盈凸月', hint: '调整方向，持续前行' },
+  { icon: '🌕', name: '满月',   hint: '感恩与释放旧有模式' },
+  { icon: '🌖', name: '亏凸月', hint: '感激所获，开始放下' },
+  { icon: '🌗', name: '下弦月', hint: '清理与释放，留出空间' },
+  { icon: '🌘', name: '残月',   hint: '休息、反思与内观' },
+]
 
-function DailyCard({ onNavigate }) {
-  const dayIndex = new Date().getDay()
+function useDailyCard() {
+  // Stable daily card based on date
+  const today = new Date()
+  const seed = today.getFullYear() * 1000 + today.getMonth() * 50 + today.getDate()
+  const idx = seed % MAJOR_ARCANA.length
+  return MAJOR_ARCANA[idx]
+}
+
+function DailyCard({ onSave }) {
+  const card = useDailyCard()
+  const [revealed, setRevealed] = useState(false)
+  const today = new Date()
+  const dateLabel = today.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+
   return (
-    <div
-      className="glass"
-      style={{
-        borderRadius: 20,
-        padding: 24,
-        marginBottom: 20,
-        background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(79,70,229,0.08))',
-        border: '1px solid rgba(124,58,237,0.25)',
-        cursor: 'pointer',
-      }}
-      onClick={() => onNavigate('tarot')}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 11, letterSpacing: '0.12em', color: '#a78bfa', fontWeight: 600, textTransform: 'uppercase' }}>
-          每日塔罗
-        </span>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
-          {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
-        </span>
-      </div>
-      <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-        <div
-          style={{
-            width: 72,
-            height: 100,
-            borderRadius: 10,
-            background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 8px 24px rgba(124,58,237,0.4)',
-            flexShrink: 0,
-            border: '1px solid rgba(255,255,255,0.15)',
-          }}
-        >
-          <span style={{ fontSize: 28 }}>{CARD_SYMBOLS[dayIndex]}</span>
-          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 4, letterSpacing: '0.1em' }}>
-            {DAILY_CARDS[dayIndex]}
-          </span>
-        </div>
+    <div className="card-soft" style={{ padding: 24, marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <p style={{ fontSize: 15, fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontFamily: 'Cinzel, serif' }}>
-            {DAILY_CARDS[dayIndex]}
-          </p>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
-            {DAILY_MESSAGES[dayIndex]}
-          </p>
-          <div style={{ marginTop: 12, display: 'flex', gap: 6 }}>
-            {['新开始', '冒险', '直觉'].map(t => (
-              <span key={t} style={{
-                fontSize: 10, padding: '3px 8px',
-                background: 'rgba(124,58,237,0.2)',
-                borderRadius: 20, color: '#a78bfa',
-                border: '1px solid rgba(124,58,237,0.3)',
-              }}>{t}</span>
-            ))}
+          <p className="section-sub">DAILY DRAW</p>
+          <p className="section-title" style={{ fontSize: 18 }}>今日塔罗</p>
+        </div>
+        <p style={{ fontSize: 11, color: '#8a7a5e', textAlign: 'right' }}>{dateLabel}</p>
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+        <div
+          className={`scene ${revealed ? 'flipped' : ''}`}
+          style={{ width: 96, height: 154, flexShrink: 0, cursor: revealed ? 'default' : 'pointer' }}
+          onClick={() => !revealed && setRevealed(true)}
+        >
+          <div className="card-3d">
+            <div className="face"><CardBack /></div>
+            <div className="face face-back"><CardFace card={card} /></div>
           </div>
         </div>
+
+        <div style={{ flex: 1 }}>
+          {!revealed ? (
+            <>
+              <p style={{ fontSize: 13, color: '#5a4a3a', lineHeight: 1.7, marginBottom: 14 }}>
+                静下心来，把今日的疑问放在心中，<br />
+                点击牌面翻开宇宙为你准备的指引。
+              </p>
+              <button
+                className="btn-primary"
+                style={{ padding: '10px 22px', fontSize: 12 }}
+                onClick={() => setRevealed(true)}
+              >
+                翻开牌面
+              </button>
+            </>
+          ) : (
+            <>
+              <h3 className="serif" style={{ fontSize: 20, color: '#2d2618', marginBottom: 4 }}>
+                {card.nameCN}
+              </h3>
+              <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.15em', marginBottom: 10 }}>
+                {card.name.toUpperCase()}
+              </p>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                {card.keywords.slice(0, 3).map(k => (
+                  <span key={k} className="pill pill-forest">{k}</span>
+                ))}
+              </div>
+              <p style={{ fontSize: 12, color: '#5a4a3a', lineHeight: 1.7 }}>
+                {card.uprightMeaning.slice(0, 50)}…
+              </p>
+            </>
+          )}
+        </div>
       </div>
+
+      {revealed && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <button
+            className="btn-secondary"
+            style={{ flex: 1, fontSize: 12, padding: '10px 14px' }}
+            onClick={() => { onSave(card); }}
+          >
+            ✦ 记入日志
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MoonPhaseCard() {
+  const day = new Date().getDate()
+  const idx = Math.floor((day % 30) / 4)
+  const phase = MOON_PHASES[idx]
+  const quote = DAILY_QUOTES[new Date().getDay()]
+
+  return (
+    <div className="card-tinted" style={{ padding: 20, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'radial-gradient(circle at 30% 30%, #faf4e8, #c4924a)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 28, flexShrink: 0,
+          boxShadow: '0 4px 16px rgba(196,146,74,0.25)',
+        }}>
+          {phase.icon}
+        </div>
+        <div>
+          <p className="section-sub">CURRENT MOON</p>
+          <p className="serif" style={{ fontSize: 18, color: '#2d2618', marginBottom: 2 }}>
+            {phase.name}
+          </p>
+          <p style={{ fontSize: 11, color: '#8a7a5e' }}>{phase.hint}</p>
+        </div>
+      </div>
+      <div style={{
+        background: 'rgba(196,146,74,0.08)',
+        borderRadius: 12, padding: 12,
+        borderLeft: '3px solid #c4924a',
+      }}>
+        <p style={{ fontSize: 12, color: '#5a4a3a', lineHeight: 1.7, fontStyle: 'italic' }}>
+          "{quote}"
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function RecentJournal({ entries, onNavigate }) {
+  if (entries.length === 0) {
+    return (
+      <div className="card-tinted" style={{ padding: 20, marginBottom: 20, textAlign: 'center' }}>
+        <p style={{ fontSize: 26, marginBottom: 8 }}>📖</p>
+        <p className="serif" style={{ fontSize: 15, color: '#2d2618', marginBottom: 6 }}>
+          你的塔罗日志还是空的
+        </p>
+        <p style={{ fontSize: 12, color: '#8a7a5e' }}>
+          每次占卜后保存，回看你的成长轨迹
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10, padding: '0 4px' }}>
+        <p className="section-sub">RECENT JOURNAL</p>
+        <span style={{ fontSize: 11, color: '#8a7a5e' }}>{entries.length} 条记录</span>
+      </div>
+      {entries.slice(0, 3).map(entry => (
+        <div
+          key={entry.id}
+          className="card-soft"
+          style={{ padding: 14, marginBottom: 8, display: 'flex', gap: 12, alignItems: 'center' }}
+        >
+          <div style={{
+            width: 36, height: 50, borderRadius: 4,
+            background: 'linear-gradient(135deg, #2d4a3e, #1f3329)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#c4924a', fontSize: 18, flexShrink: 0,
+          }}>
+            ✦
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <p className="serif" style={{ fontSize: 14, color: '#2d2618', marginBottom: 2 }}>
+              {entry.cardName || entry.spreadName || '占卜记录'}
+            </p>
+            <p style={{ fontSize: 11, color: '#8a7a5e' }}>
+              {relTime(entry.createdAt)} · {entry.spreadName || '日抽'}
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
 
 function QuickActions({ onNavigate }) {
   const actions = [
-    { icon: '🃏', label: '抽牌占卜', sub: '探索宇宙信息', page: 'tarot', color: '#7c3aed' },
-    { icon: '🔮', label: '星盘分析', sub: '解读天赋使命', page: 'astrology', color: '#0ea5e9' },
-    { icon: '✨', label: '灵性社区', sub: '与同行者连接', page: 'community', color: '#f59e0b' },
+    { icon: '🃏', label: '抽塔罗', sub: '获得指引', page: 'tarot' },
+    { icon: '🌟', label: '查星盘', sub: '解读星象', page: 'astrology' },
+    { icon: '📖', label: '词典', sub: '学习含义', page: 'library' },
+    { icon: '💬', label: '社区', sub: '交流分享', page: 'community' },
   ]
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 24 }}>
       {actions.map(a => (
         <button
           key={a.page}
           onClick={() => onNavigate(a.page)}
           style={{
-            background: `rgba(${a.color === '#7c3aed' ? '124,58,237' : a.color === '#0ea5e9' ? '14,165,233' : '245,158,11'},0.08)`,
-            border: `1px solid rgba(${a.color === '#7c3aed' ? '124,58,237' : a.color === '#0ea5e9' ? '14,165,233' : '245,158,11'},0.2)`,
-            borderRadius: 16,
-            padding: '16px 8px',
-            cursor: 'pointer',
-            textAlign: 'center',
-            transition: 'all 0.25s ease',
+            background: '#fefcf6',
+            border: '1px solid rgba(196,146,74,0.18)',
+            borderRadius: 14, padding: '14px 6px',
+            cursor: 'pointer', textAlign: 'center',
+            transition: 'all 0.2s ease',
           }}
-          onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
-          onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
         >
-          <div style={{ fontSize: 28, marginBottom: 8 }}>{a.icon}</div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', marginBottom: 3 }}>{a.label}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{a.sub}</div>
+          <div style={{ fontSize: 22, marginBottom: 4 }}>{a.icon}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#2d2618', marginBottom: 2 }}>{a.label}</div>
+          <div style={{ fontSize: 9, color: '#8a7a5e' }}>{a.sub}</div>
         </button>
       ))}
     </div>
   )
 }
 
-function MoonPhase() {
-  const day = new Date().getDate()
-  const phases = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘']
-  const phase = phases[Math.floor((day % 30) / 4)]
-  const phaseNames = ['新月', '峨眉月', '上弦月', '盈凸月', '满月', '亏凸月', '下弦月', '残月']
-  const phaseName = phaseNames[Math.floor((day % 30) / 4)]
-
-  return (
-    <div className="glass" style={{ borderRadius: 20, padding: 20, marginBottom: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ fontSize: 11, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase' }}>
-            当前月相
-          </p>
-          <p style={{ fontSize: 20, fontWeight: 700, color: '#f1f5f9', fontFamily: 'Cinzel, serif' }}>
-            {phaseName}
-          </p>
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-            {phaseName === '满月' || phaseName === '盈凸月' ? '适合感恩与释放旧有模式' :
-             phaseName === '新月' || phaseName === '峨眉月' ? '适合播种新的意图与心愿' :
-             '宇宙能量持续汇聚中'}
-          </p>
-        </div>
-        <div style={{ fontSize: 56, filter: 'drop-shadow(0 0 12px rgba(245,158,11,0.5))' }}>
-          {phase}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function Home({ onNavigate }) {
-  const [visible, setVisible] = useState(false)
-  useEffect(() => { setTimeout(() => setVisible(true), 100) }, [])
+  const [user, setUser] = useState(getUser())
+  const [journal, setJournal] = useState(getJournal())
+
+  useEffect(() => {
+    const refresh = () => setJournal(getJournal())
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [])
+
+  function handleSaveDaily(card) {
+    saveReading({
+      type: 'daily',
+      cardId: card.id,
+      cardName: card.nameCN,
+      spreadName: '每日塔罗',
+      cards: [{ cardId: card.id, reversed: false, position: '今日能量' }],
+      note: '',
+    })
+    setJournal(getJournal())
+  }
+
+  const hour = new Date().getHours()
+  const greeting = hour < 6 ? '深夜安好' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '夜晚好'
 
   return (
-    <div
-      style={{
-        padding: '60px 20px 100px',
-        maxWidth: 480,
-        margin: '0 auto',
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(20px)',
-        transition: 'all 0.6s ease',
-      }}
-    >
-      {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: 36 }}>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            background: 'rgba(245,158,11,0.1)',
-            border: '1px solid rgba(245,158,11,0.25)',
-            borderRadius: 20,
-            padding: '6px 16px',
-            marginBottom: 20,
-          }}
-        >
-          <span style={{ fontSize: 10, color: '#f59e0b', letterSpacing: '0.15em', fontWeight: 600 }}>
-            ✦ MYSTIC ORACLE ✦
-          </span>
+    <div className="animate-fade-in" style={{ padding: '40px 18px 0', maxWidth: 520, margin: '0 auto' }}>
+      {/* Header with mascot */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, paddingTop: 16 }}>
+        <div>
+          <p style={{ fontSize: 11, color: '#8a7a5e', letterSpacing: '0.15em', marginBottom: 4 }}>
+            {greeting.toUpperCase()}
+          </p>
+          <h1 className="serif" style={{ fontSize: 22, color: '#2d2618' }}>
+            {user.name}
+          </h1>
         </div>
-        <h1
-          style={{
-            fontFamily: 'Cinzel, serif',
-            fontSize: 30,
-            fontWeight: 700,
-            background: 'linear-gradient(135deg, #f59e0b, #fcd34d, #f59e0b)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            letterSpacing: '0.05em',
-            marginBottom: 10,
-          }}
-        >
-          神谕
-        </h1>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em' }}>
-          塔罗 · 星盘 · 灵性社区
-        </p>
+        <div className="animate-float" style={{
+          width: 56, height: 56,
+          background: 'rgba(196,146,74,0.1)',
+          borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Mascot size={42} />
+        </div>
       </div>
 
-      <DailyCard onNavigate={onNavigate} />
+      <DailyCard onSave={handleSaveDaily} />
+      <MoonPhaseCard />
       <QuickActions onNavigate={onNavigate} />
-      <MoonPhase />
+      <RecentJournal entries={journal} onNavigate={onNavigate} />
 
-      {/* Hot community post */}
-      <div
-        className="glass"
-        style={{ borderRadius: 20, padding: 20, cursor: 'pointer' }}
-        onClick={() => onNavigate('community')}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <span style={{ fontSize: 11, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
-            社区热帖
-          </span>
-          <span style={{ fontSize: 11, color: '#f59e0b' }}>查看全部 →</span>
-        </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <span style={{ fontSize: 32 }}>🔮</span>
-          <div>
-            <p style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', marginBottom: 6 }}>
-              土星回归——一场灵魂的必修课
-            </p>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-              28-30岁的土星回归如何成为人生最重要的蜕变期……
-            </p>
-            <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>❤ 1204</span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>💬 256</span>
-            </div>
-          </div>
-        </div>
+      {/* Footer brand */}
+      <div style={{ textAlign: 'center', padding: '20px 0 100px' }}>
+        <p style={{ fontSize: 9, color: '#8a7a5e', letterSpacing: '0.3em' }}>
+          ✦ LUNARIA TAROT ✦
+        </p>
       </div>
     </div>
   )

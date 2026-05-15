@@ -4,47 +4,15 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        cinzel: ['Cinzel', 'serif'],
-        body: ['Inter', 'sans-serif'],
+        serif: ['"Playfair Display"', 'Georgia', 'serif'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
-        cosmic: '#080818',
-        gold: '#f59e0b',
-        violet: '#7c3aed',
-        indigo: '#4f46e5',
-      },
-      keyframes: {
-        twinkle: {
-          '0%, 100%': { opacity: 1 },
-          '50%': { opacity: 0.2 },
-        },
-        float: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-12px)' },
-        },
-        glow: {
-          '0%, 100%': { boxShadow: '0 0 20px rgba(124,58,237,0.4)' },
-          '50%': { boxShadow: '0 0 40px rgba(124,58,237,0.8)' },
-        },
-        slideUp: {
-          from: { opacity: 0, transform: 'translateY(30px)' },
-          to: { opacity: 1, transform: 'translateY(0)' },
-        },
-        flipCard: {
-          '0%': { transform: 'rotateY(0deg)' },
-          '100%': { transform: 'rotateY(180deg)' },
-        },
-        shimmer: {
-          '0%': { backgroundPosition: '-200% 0' },
-          '100%': { backgroundPosition: '200% 0' },
-        },
-      },
-      animation: {
-        twinkle: 'twinkle 3s ease-in-out infinite',
-        float: 'float 4s ease-in-out infinite',
-        glow: 'glow 2s ease-in-out infinite',
-        slideUp: 'slideUp 0.6s ease-out forwards',
-        shimmer: 'shimmer 2s linear infinite',
+        cream: { 50:'#fdf9f0', 100:'#faf4e8', 200:'#f5ecd9', 300:'#ecdfbf', 400:'#dfc89a' },
+        forest: { 500:'#3d5d54', 600:'#2d4a3e', 700:'#1f3329' },
+        gold: { 400:'#d4a574', 500:'#c4924a', 600:'#a87838' },
+        wine: { 500:'#8c4a5e', 600:'#6e3848' },
+        ink: { 700:'#3d3327', 800:'#2d2618', 900:'#1a1610' },
       },
     },
   },

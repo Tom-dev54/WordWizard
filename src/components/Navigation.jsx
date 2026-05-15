@@ -1,9 +1,55 @@
 const NAV_ITEMS = [
-  { id: 'home', label: '首页', icon: '✦' },
-  { id: 'tarot', label: '塔罗', icon: '🃏' },
-  { id: 'astrology', label: '星盘', icon: '🔮' },
-  { id: 'community', label: '社区', icon: '✨' },
+  { id: 'home',      label: '每日', icon: HomeIcon },
+  { id: 'tarot',     label: '占卜', icon: TarotIcon },
+  { id: 'astrology', label: '星盘', icon: AstroIcon },
+  { id: 'library',   label: '词典', icon: BookIcon },
+  { id: 'community', label: '社区', icon: PeopleIcon },
 ]
+
+function HomeIcon({ active }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="4" fill={active ? '#2d4a3e' : 'none'} stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="9" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.2" strokeDasharray="2 2" opacity="0.6" />
+    </svg>
+  )
+}
+function TarotIcon({ active }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="6" y="3" width="10" height="16" rx="1.5" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.5" fill={active ? 'rgba(45,74,62,0.15)' : 'none'} transform="rotate(-8 11 11)" />
+      <rect x="9" y="5" width="10" height="16" rx="1.5" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.5" fill={active ? 'rgba(45,74,62,0.25)' : 'none'} transform="rotate(8 14 13)" />
+    </svg>
+  )
+}
+function AstroIcon({ active }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" />
+      <circle cx="12" cy="12" r="3" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill={active ? '#2d4a3e' : 'none'} />
+      <line x1="3" y1="12" x2="21" y2="12" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1" opacity="0.5" />
+      <line x1="12" y1="3" x2="12" y2="21" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1" opacity="0.5" />
+    </svg>
+  )
+}
+function BookIcon({ active }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M 4 5 L 4 19 Q 4 20, 5 20 L 11 20 L 11 6 Q 7 4, 4 5 Z" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill={active ? 'rgba(45,74,62,0.15)' : 'none'} strokeLinejoin="round" />
+      <path d="M 20 5 L 20 19 Q 20 20, 19 20 L 13 20 L 13 6 Q 17 4, 20 5 Z" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill={active ? 'rgba(45,74,62,0.15)' : 'none'} strokeLinejoin="round" />
+    </svg>
+  )
+}
+function PeopleIcon({ active }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="9" cy="9" r="3" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill={active ? 'rgba(45,74,62,0.2)' : 'none'} />
+      <circle cx="16" cy="10" r="2.5" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill={active ? 'rgba(45,74,62,0.2)' : 'none'} />
+      <path d="M 3 19 Q 3 14, 9 14 Q 15 14, 15 19" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill="none" strokeLinecap="round" />
+      <path d="M 14 18 Q 14 15, 16 15 Q 20 15, 20 19" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill="none" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 export default function Navigation({ current, onNavigate }) {
   return (
@@ -14,60 +60,59 @@ export default function Navigation({ current, onNavigate }) {
         left: 0,
         right: 0,
         zIndex: 100,
-        background: 'rgba(8,8,24,0.85)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(253,249,240,0.92)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderTop: '1px solid rgba(196,146,74,0.18)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '8px 0' }}>
-        {NAV_ITEMS.map((item) => {
+      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '8px 4px 4px' }}>
+        {NAV_ITEMS.map(item => {
           const active = current === item.id
+          const Icon = item.icon
           return (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
               style={{
+                flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: 4,
-                padding: '8px 16px',
+                padding: '8px 0 6px',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
                 position: 'relative',
               }}
             >
-              {active && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: -1,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 32,
-                    height: 2,
-                    background: 'linear-gradient(90deg, #7c3aed, #f59e0b)',
-                    borderRadius: 1,
-                  }}
-                />
-              )}
-              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              <Icon active={active} />
               <span
                 style={{
                   fontSize: 10,
-                  fontFamily: 'Inter, sans-serif',
                   letterSpacing: '0.05em',
-                  color: active ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+                  color: active ? '#2d4a3e' : '#8a7a5e',
                   fontWeight: active ? 600 : 400,
-                  transition: 'color 0.2s',
                 }}
               >
                 {item.label}
               </span>
+              {active && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 16,
+                    height: 2,
+                    borderRadius: 1,
+                    background: '#c4924a',
+                  }}
+                />
+              )}
             </button>
           )
         })}

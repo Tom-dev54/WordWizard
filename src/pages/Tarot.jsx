@@ -1,197 +1,108 @@
 import { useState } from 'react'
 import { MAJOR_ARCANA, SPREADS } from '../data/tarotCards'
+import { CardFace, CardBack } from '../components/TarotCardArt'
+import { saveReading } from '../utils/storage'
 
-function TarotCard({ card, position, isReversed, flipped, onClick }) {
+function drawCards(count) {
+  const shuffled = [...MAJOR_ARCANA].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, count).map(card => ({
+    card,
+    reversed: Math.random() > 0.65,
+  }))
+}
+
+function TarotCard({ card, reversed, position, flipped, onClick, narrow }) {
+  const w = narrow ? 90 : 120
   return (
-    <div
-      className="card-scene"
-      style={{ width: '100%', aspectRatio: '2/3', cursor: flipped ? 'default' : 'pointer' }}
-      onClick={!flipped ? onClick : undefined}
-    >
-      <div className={`card-inner ${flipped ? 'flipped' : ''}`}>
-        {/* Front (face down) */}
-        <div
-          className="card-face"
-          style={{
-            background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid rgba(124,58,237,0.4)',
-          }}
-        >
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: '50%',
-                border: '2px solid rgba(245,158,11,0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 8px',
-              }}
-            >
-              <span style={{ fontSize: 20, color: 'rgba(245,158,11,0.6)' }}>✦</span>
-            </div>
-            {position && (
-              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em' }}>{position}</p>
-            )}
-          </div>
-        </div>
-        {/* Back (revealed) */}
-        <div
-          className="card-back"
-          style={{
-            background: `linear-gradient(135deg, ${card?.colors?.[0] || '#7c3aed'}, ${card?.colors?.[1] || '#4f46e5'})`,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: 16,
-            border: '2px solid rgba(255,255,255,0.15)',
-            transform: isReversed ? 'rotateY(180deg) rotate(180deg)' : 'rotateY(180deg)',
-          }}
-        >
-          <p style={{
-            fontSize: 8, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.6)',
-            textTransform: 'uppercase',
-          }}>
-            {card?.number}
-          </p>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 8 }}>{card?.symbol}</div>
-            <div
-              style={{
-                width: '100%',
-                height: 1,
-                background: 'rgba(255,255,255,0.2)',
-                marginBottom: 8,
-              }}
-            />
-            <p style={{
-              fontSize: 11, fontFamily: 'Cinzel, serif',
-              color: 'rgba(255,255,255,0.9)', letterSpacing: '0.05em',
-            }}>
-              {card?.nameCN}
-            </p>
-            {isReversed && (
-              <span style={{
-                fontSize: 8, color: 'rgba(255,255,255,0.5)',
-                display: 'block', marginTop: 3,
-              }}>逆位</span>
-            )}
-          </div>
-          {position && (
-            <p style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>{position}</p>
-          )}
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div
+        className={`scene ${flipped ? 'flipped' : ''}`}
+        style={{
+          width: '100%',
+          aspectRatio: '2/3',
+          cursor: flipped ? 'pointer' : 'pointer',
+        }}
+        onClick={onClick}
+      >
+        <div className="card-3d">
+          <div className="face"><CardBack /></div>
+          <div className="face face-back"><CardFace card={card} reversed={reversed} /></div>
         </div>
       </div>
+      {position && (
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            {position}
+          </p>
+          {flipped && (
+            <p className="serif" style={{ fontSize: 12, color: '#2d2618', marginTop: 2 }}>
+              {card.nameCN} {reversed && <span style={{ fontSize: 9, color: '#8c4a5e' }}>(逆)</span>}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-function CardDetail({ card, isReversed, onClose }) {
+function CardDetailSheet({ card, reversed, onClose }) {
   if (!card) return null
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 200,
-        background: 'rgba(0,0,0,0.85)',
-        backdropFilter: 'blur(12px)',
-        display: 'flex',
-        alignItems: 'flex-end',
-        padding: '0',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: '100%',
-          background: 'linear-gradient(180deg, #0f0f2e, #080818)',
-          borderRadius: '24px 24px 0 0',
-          padding: '24px 24px 48px',
-          border: '1px solid rgba(255,255,255,0.08)',
-          maxHeight: '80vh',
-          overflowY: 'auto',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', gap: 20, marginBottom: 24 }}>
-          <div
-            style={{
-              width: 80, height: 120,
-              borderRadius: 12, flexShrink: 0,
-              background: `linear-gradient(135deg, ${card.colors[0]}, ${card.colors[1]})`,
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              boxShadow: `0 8px 32px ${card.colors[0]}60`,
-            }}
-          >
-            <span style={{ fontSize: 36 }}>{card.symbol}</span>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{card.nameCN}</span>
+    <div className="sheet" onClick={onClose}>
+      <div className="sheet-content" onClick={e => e.stopPropagation()}>
+        <div className="sheet-handle" />
+
+        <div style={{ display: 'flex', gap: 18, marginBottom: 20 }}>
+          <div style={{ width: 90, height: 140, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}>
+            <CardFace card={card} reversed={reversed} />
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{card.number}</span>
-              {isReversed && (
-                <span style={{
-                  fontSize: 9, padding: '2px 8px',
-                  background: 'rgba(220,38,38,0.2)',
-                  border: '1px solid rgba(220,38,38,0.3)',
-                  borderRadius: 10, color: '#fca5a5',
-                }}>逆位</span>
-              )}
-            </div>
-            <h2 style={{
-              fontSize: 22, fontFamily: 'Cinzel, serif',
-              color: '#f1f5f9', marginBottom: 4,
-            }}>{card.nameCN}</h2>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{card.name}</p>
-            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10, color: '#a78bfa' }}>🌀 {card.element}</span>
-              <span style={{ fontSize: 10, color: '#60a5fa' }}>🪐 {card.planet}</span>
+          <div style={{ paddingTop: 6 }}>
+            <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.2em', marginBottom: 6 }}>
+              {card.number}
+            </p>
+            <h2 className="serif" style={{ fontSize: 24, color: '#2d2618', marginBottom: 2 }}>
+              {card.nameCN}
+            </h2>
+            <p style={{ fontSize: 12, color: '#8a7a5e', fontStyle: 'italic', marginBottom: 12 }}>
+              {card.name}
+            </p>
+            {reversed && (
+              <span className="pill pill-wine">逆位 · Reversed</span>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, fontSize: 11, color: '#5a4a3a' }}>
+              <span>🜂 {card.element}</span>
+              <span style={{ color: '#c4924a' }}>·</span>
+              <span>🪐 {card.planet}</span>
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
-          {card.keywords.map(k => (
-            <span key={k} style={{
-              fontSize: 11, padding: '4px 10px',
-              background: `rgba(${card.colors[0] === '#7c3aed' ? '124,58,237' : '79,70,229'},0.15)`,
-              borderRadius: 20, color: '#c4b5fd',
-              border: '1px solid rgba(124,58,237,0.25)',
-            }}>{k}</span>
-          ))}
+        <div style={{ marginBottom: 18 }}>
+          <p className="section-sub" style={{ marginBottom: 8 }}>关键词</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {card.keywords.map(k => (
+              <span key={k} className="pill pill-forest">{k}</span>
+            ))}
+          </div>
         </div>
 
         <div style={{
-          background: 'rgba(255,255,255,0.04)',
-          borderRadius: 16, padding: 16, marginBottom: 12,
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: reversed ? 'rgba(140,74,94,0.06)' : 'rgba(45,74,62,0.06)',
+          borderRadius: 14, padding: 16, marginBottom: 14,
+          borderLeft: `3px solid ${reversed ? '#8c4a5e' : '#2d4a3e'}`,
         }}>
-          <p style={{ fontSize: 11, color: isReversed ? '#fca5a5' : '#86efac', marginBottom: 8, letterSpacing: '0.08em' }}>
-            {isReversed ? '▼ 逆位解读' : '▲ 正位解读'}
+          <p style={{
+            fontSize: 11, color: reversed ? '#6e3848' : '#2d4a3e',
+            letterSpacing: '0.15em', marginBottom: 10, fontWeight: 600,
+          }}>
+            {reversed ? '▽ 逆位解读' : '△ 正位解读'}
           </p>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.8 }}>
-            {isReversed ? card.reversedMeaning : card.uprightMeaning}
+          <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.8 }}>
+            {reversed ? card.reversedMeaning : card.uprightMeaning}
           </p>
         </div>
 
-        <button
-          onClick={onClose}
-          style={{
-            width: '100%', padding: 14,
-            background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-            border: 'none', borderRadius: 14,
-            color: 'white', fontSize: 14, fontWeight: 600,
-            cursor: 'pointer', marginTop: 8,
-          }}
-        >
+        <button onClick={onClose} className="btn-primary" style={{ width: '100%' }}>
           收起解读
         </button>
       </div>
@@ -199,102 +110,164 @@ function CardDetail({ card, isReversed, onClose }) {
   )
 }
 
-function drawCards(count) {
-  const shuffled = [...MAJOR_ARCANA].sort(() => Math.random() - 0.5)
-  return shuffled.slice(0, count).map(card => ({
-    card,
-    isReversed: Math.random() > 0.6,
-  }))
+function SaveJournalSheet({ spread, cards, onClose, onSaved }) {
+  const [note, setNote] = useState('')
+  const [question, setQuestion] = useState('')
+
+  function handleSave() {
+    saveReading({
+      type: 'spread',
+      spreadName: spread.name,
+      spreadId: spread.id,
+      question,
+      note,
+      cards: cards.map((c, i) => ({
+        cardId: c.card.id,
+        cardName: c.card.nameCN,
+        reversed: c.reversed,
+        position: spread.positions[i],
+      })),
+    })
+    onSaved()
+  }
+
+  return (
+    <div className="sheet" onClick={onClose}>
+      <div className="sheet-content" onClick={e => e.stopPropagation()}>
+        <div className="sheet-handle" />
+        <h3 className="serif" style={{ fontSize: 20, color: '#2d2618', marginBottom: 4 }}>记入日志</h3>
+        <p style={{ fontSize: 12, color: '#8a7a5e', marginBottom: 18 }}>
+          保存这次占卜，方便日后回顾与思考
+        </p>
+
+        <label style={{ display: 'block', marginBottom: 14 }}>
+          <span style={{ fontSize: 11, color: '#5a4a3a', display: 'block', marginBottom: 6 }}>问题（可选）</span>
+          <input
+            value={question}
+            onChange={e => setQuestion(e.target.value)}
+            placeholder="此次占卜你想问什么？"
+            style={{
+              width: '100%', padding: '12px 14px',
+              background: '#fff',
+              border: '1px solid rgba(196,146,74,0.25)',
+              borderRadius: 12, color: '#2d2618',
+              fontSize: 14,
+            }}
+          />
+        </label>
+
+        <label style={{ display: 'block', marginBottom: 18 }}>
+          <span style={{ fontSize: 11, color: '#5a4a3a', display: 'block', marginBottom: 6 }}>笔记（可选）</span>
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="记录你的感受、想法或解读…"
+            rows={4}
+            style={{
+              width: '100%', padding: '12px 14px',
+              background: '#fff',
+              border: '1px solid rgba(196,146,74,0.25)',
+              borderRadius: 12, color: '#2d2618',
+              fontSize: 13, lineHeight: 1.7, resize: 'none',
+            }}
+          />
+        </label>
+
+        <button onClick={handleSave} className="btn-primary" style={{ width: '100%', marginBottom: 8 }}>
+          ✦ 保存到日志
+        </button>
+        <button onClick={onClose} style={{
+          width: '100%', background: 'none', border: 'none',
+          padding: 10, color: '#8a7a5e', fontSize: 12, cursor: 'pointer',
+        }}>
+          取消
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default function Tarot() {
-  const [selectedSpread, setSelectedSpread] = useState(null)
-  const [drawnCards, setDrawnCards] = useState([])
-  const [flippedCards, setFlippedCards] = useState([])
-  const [detailCard, setDetailCard] = useState(null)
-  const [phase, setPhase] = useState('select') // select | shuffle | reveal | detail
+  const [phase, setPhase] = useState('select')
+  const [spread, setSpread] = useState(null)
+  const [drawn, setDrawn] = useState([])
+  const [flipped, setFlipped] = useState([])
+  const [detail, setDetail] = useState(null)
+  const [showSave, setShowSave] = useState(false)
+  const [savedToast, setSavedToast] = useState(false)
 
-  function handleSpreadSelect(spread) {
-    setSelectedSpread(spread)
+  function startSpread(s) {
+    setSpread(s)
     setPhase('shuffle')
-    setDrawnCards([])
-    setFlippedCards([])
+    setDrawn([])
+    setFlipped([])
   }
 
   function handleDraw() {
-    const cards = drawCards(selectedSpread.count)
-    setDrawnCards(cards)
+    const cards = drawCards(spread.count)
+    setDrawn(cards)
     setPhase('reveal')
     cards.forEach((_, i) => {
-      setTimeout(() => {
-        setFlippedCards(prev => [...prev, i])
-      }, i * 400 + 300)
+      setTimeout(() => setFlipped(prev => [...prev, i]), i * 350 + 300)
     })
-  }
-
-  function handleCardClick(index) {
-    if (!flippedCards.includes(index)) return
-    const { card, isReversed } = drawnCards[index]
-    setDetailCard({ card, isReversed })
   }
 
   function handleReset() {
     setPhase('select')
-    setSelectedSpread(null)
-    setDrawnCards([])
-    setFlippedCards([])
+    setSpread(null)
+    setDrawn([])
+    setFlipped([])
   }
 
-  const gridCols = selectedSpread?.count === 1 ? 1 : selectedSpread?.count === 3 ? 3 : selectedSpread?.count === 5 ? 3 : 1
+  function handleSaved() {
+    setShowSave(false)
+    setSavedToast(true)
+    setTimeout(() => setSavedToast(false), 2000)
+  }
 
   return (
-    <div style={{ padding: '60px 20px 100px', maxWidth: 480, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <p style={{ fontSize: 11, letterSpacing: '0.15em', color: '#a78bfa', marginBottom: 8, textTransform: 'uppercase' }}>
-          ✦ Tarot Reading ✦
-        </p>
-        <h1 style={{ fontFamily: 'Cinzel, serif', fontSize: 24, color: '#f1f5f9' }}>塔罗占卜</h1>
+    <div className="animate-fade-in pb-nav" style={{ padding: '40px 18px 0', maxWidth: 520, margin: '0 auto' }}>
+      <div style={{ paddingTop: 16, marginBottom: 24, textAlign: 'center' }}>
+        <p className="section-sub">DIVINATION</p>
+        <h1 className="serif" style={{ fontSize: 26, color: '#2d2618' }}>塔罗占卜</h1>
       </div>
 
       {phase === 'select' && (
-        <div style={{ animation: 'slideUp 0.5s ease-out' }}>
-          <p style={{ textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 24 }}>
-            静下心来，带着你的问题，选择一种牌阵
+        <div className="animate-fade-up">
+          <p style={{ fontSize: 13, color: '#5a4a3a', lineHeight: 1.7, textAlign: 'center', marginBottom: 24 }}>
+            深呼吸，让心静下来。<br />
+            带着你的问题，选择适合的牌阵。
           </p>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {SPREADS.map((spread) => (
+            {SPREADS.map(s => (
               <button
-                key={spread.id}
-                onClick={() => handleSpreadSelect(spread)}
+                key={s.id}
+                onClick={() => startSpread(s)}
+                className="card-soft"
                 style={{
-                  background: 'rgba(124,58,237,0.08)',
-                  border: '1px solid rgba(124,58,237,0.2)',
-                  borderRadius: 16, padding: '18px 20px',
-                  cursor: 'pointer', textAlign: 'left',
-                  transition: 'all 0.25s ease',
+                  padding: 18, cursor: 'pointer',
+                  border: 'none', textAlign: 'left',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(124,58,237,0.15)'
-                  e.currentTarget.style.borderColor = 'rgba(124,58,237,0.4)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(124,58,237,0.08)'
-                  e.currentTarget.style.borderColor = 'rgba(124,58,237,0.2)'
+                  background: '#ffffff',
                 }}
               >
                 <div>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: '#f1f5f9', marginBottom: 4 }}>{spread.name}</p>
-                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{spread.desc}</p>
+                  <p className="serif" style={{ fontSize: 17, color: '#2d2618', marginBottom: 4 }}>{s.name}</p>
+                  <p style={{ fontSize: 12, color: '#8a7a5e' }}>{s.desc}</p>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    {s.positions.map(p => (
+                      <span key={p} className="pill pill-cream" style={{ fontSize: 10 }}>{p}</span>
+                    ))}
+                  </div>
                 </div>
                 <div style={{
-                  width: 36, height: 36,
-                  background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-                  borderRadius: 10, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, color: 'white',
+                  width: 44, height: 44, borderRadius: 12,
+                  background: 'linear-gradient(135deg, #2d4a3e, #1f3329)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#c4924a', fontSize: 16, flexShrink: 0,
                 }}>
-                  {spread.count}
+                  {s.count}
                 </div>
               </button>
             ))}
@@ -303,150 +276,147 @@ export default function Tarot() {
       )}
 
       {phase === 'shuffle' && (
-        <div style={{ textAlign: 'center', animation: 'slideUp 0.5s ease-out' }}>
-          <div style={{ fontSize: 80, marginBottom: 24, animation: 'float 3s ease-in-out infinite' }}>🃏</div>
-          <p style={{ fontSize: 15, color: '#f1f5f9', marginBottom: 8 }}>已选择：{selectedSpread.name}</p>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.7, marginBottom: 32 }}>
+        <div className="animate-fade-up" style={{ textAlign: 'center', paddingTop: 24 }}>
+          <div className="animate-float" style={{ marginBottom: 24 }}>
+            <div style={{ width: 120, height: 180, margin: '0 auto', borderRadius: 10, overflow: 'hidden' }}>
+              <CardBack />
+            </div>
+          </div>
+          <h2 className="serif" style={{ fontSize: 18, color: '#2d2618', marginBottom: 6 }}>
+            {spread.name}
+          </h2>
+          <p style={{ fontSize: 12, color: '#5a4a3a', lineHeight: 1.8, marginBottom: 28 }}>
             深呼吸，让心静下来<br />
-            将你的问题放在心中<br />
-            当你准备好时，点击抽牌
+            将你的问题在心中默念三遍<br />
+            当你准备好时，点击开始抽牌
           </p>
-          <button
-            onClick={handleDraw}
-            style={{
-              background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-              border: 'none', borderRadius: 16,
-              padding: '16px 40px', color: 'white',
-              fontSize: 15, fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 8px 32px rgba(124,58,237,0.4)',
-              fontFamily: 'Cinzel, serif', letterSpacing: '0.05em',
-            }}
-          >
-            ✦ 抽牌 ✦
+          <button className="btn-primary" onClick={handleDraw} style={{ marginBottom: 12 }}>
+            ✦ 开始抽牌 ✦
           </button>
-          <button
-            onClick={handleReset}
-            style={{
-              display: 'block', margin: '16px auto 0',
-              background: 'none', border: 'none',
-              color: 'rgba(255,255,255,0.35)', fontSize: 12, cursor: 'pointer',
-            }}
-          >
-            ← 重新选择牌阵
-          </button>
+          <div>
+            <button onClick={handleReset} style={{
+              background: 'none', border: 'none', color: '#8a7a5e', fontSize: 12, cursor: 'pointer',
+            }}>
+              ← 重选牌阵
+            </button>
+          </div>
         </div>
       )}
 
-      {phase === 'reveal' && drawnCards.length > 0 && (
-        <div style={{ animation: 'slideUp 0.5s ease-out' }}>
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>
-            点击牌面查看详细解读
+      {phase === 'reveal' && drawn.length > 0 && (
+        <div className="animate-fade-up">
+          <p style={{ textAlign: 'center', fontSize: 12, color: '#8a7a5e', marginBottom: 18 }}>
+            ✦ {spread.name} · 点击牌面查看详细解读 ✦
           </p>
 
-          {selectedSpread.count === 1 && (
-            <div style={{ width: '50%', margin: '0 auto 24px' }}>
+          {spread.count === 1 && (
+            <div style={{ width: 180, margin: '0 auto 24px' }}>
               <TarotCard
-                card={drawnCards[0]?.card}
-                position={selectedSpread.positions[0]}
-                isReversed={drawnCards[0]?.isReversed}
-                flipped={flippedCards.includes(0)}
-                onClick={() => handleCardClick(0)}
+                card={drawn[0].card} reversed={drawn[0].reversed}
+                position={spread.positions[0]}
+                flipped={flipped.includes(0)}
+                onClick={() => flipped.includes(0) && setDetail(drawn[0])}
               />
             </div>
           )}
 
-          {selectedSpread.count === 3 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-              {drawnCards.map(({ card, isReversed }, i) => (
+          {spread.count === 3 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24 }}>
+              {drawn.map((d, i) => (
                 <TarotCard
-                  key={i} card={card} position={selectedSpread.positions[i]}
-                  isReversed={isReversed} flipped={flippedCards.includes(i)}
-                  onClick={() => handleCardClick(i)}
+                  key={i} card={d.card} reversed={d.reversed}
+                  position={spread.positions[i]}
+                  flipped={flipped.includes(i)} narrow
+                  onClick={() => flipped.includes(i) && setDetail(d)}
                 />
               ))}
             </div>
           )}
 
-          {selectedSpread.count === 5 && (
+          {spread.count === 5 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24 }}>
-              {drawnCards.map(({ card, isReversed }, i) => (
+              {drawn.map((d, i) => (
                 <div key={i} style={{ gridColumn: i === 4 ? '2' : 'auto' }}>
                   <TarotCard
-                    card={card} position={selectedSpread.positions[i]}
-                    isReversed={isReversed} flipped={flippedCards.includes(i)}
-                    onClick={() => handleCardClick(i)}
+                    card={d.card} reversed={d.reversed}
+                    position={spread.positions[i]}
+                    flipped={flipped.includes(i)} narrow
+                    onClick={() => flipped.includes(i) && setDetail(d)}
                   />
                 </div>
               ))}
             </div>
           )}
 
-          {flippedCards.length === drawnCards.length && (
-            <div style={{ marginTop: 16 }}>
-              {drawnCards.map(({ card, isReversed }, i) => (
-                <div
+          {flipped.length === drawn.length && (
+            <div>
+              <div className="divider">✦ 牌阵解读 ✦</div>
+              {drawn.map((d, i) => (
+                <button
                   key={i}
-                  className="glass"
+                  onClick={() => setDetail(d)}
+                  className="card-soft"
                   style={{
-                    borderRadius: 16, padding: 16, marginBottom: 12,
-                    cursor: 'pointer', transition: 'all 0.25s ease',
-                    animation: `slideUp 0.5s ease-out ${i * 0.1}s both`,
+                    width: '100%', padding: 14, marginBottom: 10,
+                    display: 'flex', gap: 12, alignItems: 'center',
+                    cursor: 'pointer', border: 'none', textAlign: 'left',
+                    animation: `fade-up 0.5s ease-out ${i * 0.1}s both`,
                   }}
-                  onClick={() => setDetailCard({ card, isReversed })}
                 >
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <div
-                      style={{
-                        width: 40, height: 56,
-                        borderRadius: 8, flexShrink: 0,
-                        background: `linear-gradient(135deg, ${card.colors[0]}, ${card.colors[1]})`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 20,
-                      }}
-                    >
-                      {card.symbol}
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 3 }}>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{selectedSpread.positions[i]}</span>
-                        {isReversed && (
-                          <span style={{ fontSize: 9, color: '#fca5a5', background: 'rgba(220,38,38,0.15)', padding: '1px 6px', borderRadius: 8 }}>逆位</span>
-                        )}
-                      </div>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', fontFamily: 'Cinzel, serif' }}>
-                        {card.nameCN}
-                      </p>
-                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
-                        {(isReversed ? card.reversedMeaning : card.uprightMeaning).slice(0, 45)}…
-                      </p>
-                    </div>
-                    <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.25)', fontSize: 16 }}>›</span>
+                  <div style={{ width: 50, height: 78, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+                    <CardFace card={d.card} reversed={d.reversed} />
                   </div>
-                </div>
+                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.1em', marginBottom: 2 }}>
+                      {spread.positions[i]}
+                    </p>
+                    <p className="serif" style={{ fontSize: 15, color: '#2d2618', marginBottom: 3 }}>
+                      {d.card.nameCN}
+                      {d.reversed && <span style={{ fontSize: 10, color: '#8c4a5e', marginLeft: 6 }}>逆</span>}
+                    </p>
+                    <p style={{ fontSize: 11, color: '#5a4a3a', lineHeight: 1.5,
+                      overflow: 'hidden', textOverflow: 'ellipsis',
+                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    }}>
+                      {(d.reversed ? d.card.reversedMeaning : d.card.uprightMeaning).slice(0, 50)}…
+                    </p>
+                  </div>
+                  <span style={{ color: '#c4924a', fontSize: 16 }}>›</span>
+                </button>
               ))}
 
-              <button
-                onClick={handleReset}
-                style={{
-                  width: '100%', padding: 14,
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 14, color: 'rgba(255,255,255,0.6)',
-                  fontSize: 14, cursor: 'pointer', marginTop: 8,
-                }}
-              >
-                重新占卜
-              </button>
+              <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowSave(true)}>
+                  ✦ 记入日志
+                </button>
+                <button className="btn-primary" style={{ flex: 1 }} onClick={handleReset}>
+                  重新占卜
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      <CardDetail
-        card={detailCard?.card}
-        isReversed={detailCard?.isReversed}
-        onClose={() => setDetailCard(null)}
-      />
+      {detail && (
+        <CardDetailSheet card={detail.card} reversed={detail.reversed} onClose={() => setDetail(null)} />
+      )}
+      {showSave && (
+        <SaveJournalSheet spread={spread} cards={drawn} onClose={() => setShowSave(false)} onSaved={handleSaved} />
+      )}
+      {savedToast && (
+        <div style={{
+          position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+          background: '#2d4a3e', color: '#fdf9f0',
+          padding: '12px 22px', borderRadius: 999,
+          fontSize: 13, boxShadow: '0 8px 24px rgba(45,74,62,0.3)', zIndex: 300,
+          animation: 'fade-up 0.3s ease-out',
+        }}>
+          ✦ 已保存到日志
+        </div>
+      )}
+
+      <div style={{ height: 100 }} />
     </div>
   )
 }

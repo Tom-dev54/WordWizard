@@ -1,42 +1,34 @@
 import { useState } from 'react'
-import { ZODIAC_SIGNS, getZodiacByDate, getZodiacDegree } from '../data/zodiacData'
+import { ZODIAC_SIGNS, getZodiacByDate } from '../data/zodiacData'
+
+const ELEMENT_COLORS = {
+  '火': '#c44a3e', '土': '#5c7a3e', '风': '#c4924a', '水': '#3e6c8c',
+}
 
 function ZodiacWheel({ highlightId }) {
   const size = 280
   const cx = size / 2, cy = size / 2
-  const outerR = 125, innerR = 85, labelR = 108
-
-  const elementColors = { '火': '#ef4444', '土': '#22c55e', '风': '#eab308', '水': '#3b82f6' }
+  const outerR = 130, innerR = 88, labelR = 110
 
   return (
-    <svg
-      width={size} height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      className="zodiac-wheel"
-      style={{ display: 'block', margin: '0 auto' }}
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+      style={{ display: 'block', margin: '0 auto', filter: 'drop-shadow(0 4px 16px rgba(196,146,74,0.2))' }}
     >
       <defs>
-        <radialGradient id="wheelBg" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="rgba(124,58,237,0.1)" />
-          <stop offset="100%" stopColor="rgba(8,8,24,0.8)" />
+        <radialGradient id="wheelCenter" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#fdf9f0" />
+          <stop offset="100%" stopColor="#f5ecd9" />
         </radialGradient>
-        {ZODIAC_SIGNS.map(sign => (
-          <radialGradient key={`grad-${sign.id}`} id={`grad-${sign.id}`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={sign.colors[0]} stopOpacity="0.9" />
-            <stop offset="100%" stopColor={sign.colors[1]} stopOpacity="0.7" />
-          </radialGradient>
-        ))}
       </defs>
 
-      {/* Background */}
-      <circle cx={cx} cy={cy} r={outerR + 5} fill="url(#wheelBg)" />
-      <circle cx={cx} cy={cy} r={outerR + 5} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+      {/* Outer ring */}
+      <circle cx={cx} cy={cy} r={outerR + 4} fill="none" stroke="#c4924a" strokeWidth="1" opacity="0.4" />
 
       {/* Segments */}
       {ZODIAC_SIGNS.map((sign, i) => {
         const startAngle = (i * 30 - 90) * (Math.PI / 180)
         const endAngle = ((i + 1) * 30 - 90) * (Math.PI / 180)
-        const isHighlighted = sign.id === highlightId
+        const isHi = sign.id === highlightId
 
         const x1 = cx + outerR * Math.cos(startAngle)
         const y1 = cy + outerR * Math.sin(startAngle)
@@ -51,23 +43,24 @@ function ZodiacWheel({ highlightId }) {
         const lx = cx + labelR * Math.cos(midAngle)
         const ly = cy + labelR * Math.sin(midAngle)
 
-        const color = elementColors[sign.element] || '#7c3aed'
+        const color = ELEMENT_COLORS[sign.element]
 
         return (
           <g key={sign.id}>
             <path
               d={`M ${x1} ${y1} A ${outerR} ${outerR} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${innerR} ${innerR} 0 0 0 ${x4} ${y4} Z`}
-              fill={isHighlighted ? color : `${color}20`}
-              stroke={isHighlighted ? color : 'rgba(255,255,255,0.08)'}
-              strokeWidth={isHighlighted ? 1.5 : 0.5}
+              fill={isHi ? color : '#faf4e8'}
+              stroke={isHi ? color : '#e6d4b0'}
+              strokeWidth={isHi ? 1.5 : 0.5}
               style={{ transition: 'all 0.5s ease' }}
+              opacity={isHi ? 0.9 : 1}
             />
             <text
-              x={lx} y={ly}
+              x={lx} y={ly + 2}
               textAnchor="middle" dominantBaseline="middle"
-              fontSize={isHighlighted ? 14 : 11}
-              fill={isHighlighted ? 'white' : 'rgba(255,255,255,0.4)'}
-              style={{ transition: 'all 0.5s ease', fontFamily: 'sans-serif' }}
+              fontSize={isHi ? 16 : 13}
+              fill={isHi ? '#fdf9f0' : color}
+              style={{ transition: 'all 0.5s ease' }}
             >
               {sign.symbol}
             </text>
@@ -76,25 +69,32 @@ function ZodiacWheel({ highlightId }) {
       })}
 
       {/* Inner circle */}
-      <circle cx={cx} cy={cy} r={innerR} fill="#0f0f2e" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+      <circle cx={cx} cy={cy} r={innerR} fill="url(#wheelCenter)" stroke="#c4924a" strokeWidth="1" opacity="0.9" />
+      <circle cx={cx} cy={cy} r={innerR - 6} fill="none" stroke="#c4924a" strokeWidth="0.5" opacity="0.3" strokeDasharray="2 3" />
 
-      {/* Center text */}
+      {/* Center */}
       {highlightId ? (
         <>
-          <text x={cx} y={cy - 12} textAnchor="middle" fontSize="22"
-            fill="white" fontFamily="sans-serif">
-            {ZODIAC_SIGNS.find(s => s.id === highlightId)?.symbol}
+          <text x={cx} y={cy - 14} textAnchor="middle" fontSize="32" fill={ELEMENT_COLORS[ZODIAC_SIGNS.find(s => s.id === highlightId).element]}>
+            {ZODIAC_SIGNS.find(s => s.id === highlightId).symbol}
           </text>
-          <text x={cx} y={cy + 12} textAnchor="middle" fontSize="11"
-            fill="rgba(255,255,255,0.6)" fontFamily="Inter, sans-serif" letterSpacing="1">
-            {ZODIAC_SIGNS.find(s => s.id === highlightId)?.name}
+          <text x={cx} y={cy + 14} textAnchor="middle" fontSize="13"
+            fill="#2d2618" fontFamily="Playfair Display, serif" fontWeight="600">
+            {ZODIAC_SIGNS.find(s => s.id === highlightId).name}
+          </text>
+          <text x={cx} y={cy + 28} textAnchor="middle" fontSize="9" fill="#8a7a5e" letterSpacing="1">
+            {ZODIAC_SIGNS.find(s => s.id === highlightId).element}象星座
           </text>
         </>
       ) : (
-        <text x={cx} y={cy + 5} textAnchor="middle" fontSize="11"
-          fill="rgba(255,255,255,0.3)" fontFamily="Cinzel, serif" letterSpacing="2">
-          ORACLE
-        </text>
+        <>
+          <text x={cx} y={cy - 4} textAnchor="middle" fontSize="11" fill="#8a7a5e" letterSpacing="3" fontFamily="Playfair Display, serif">
+            ZODIAC
+          </text>
+          <text x={cx} y={cy + 14} textAnchor="middle" fontSize="9" fill="#8a7a5e" letterSpacing="2">
+            WHEEL
+          </text>
+        </>
       )}
 
       {/* Dividers */}
@@ -104,7 +104,7 @@ function ZodiacWheel({ highlightId }) {
           <line key={i}
             x1={cx + innerR * Math.cos(angle)} y1={cy + innerR * Math.sin(angle)}
             x2={cx + outerR * Math.cos(angle)} y2={cy + outerR * Math.sin(angle)}
-            stroke="rgba(255,255,255,0.12)" strokeWidth="0.5"
+            stroke="#c4924a" strokeWidth="0.4" opacity="0.5"
           />
         )
       })}
@@ -113,121 +113,108 @@ function ZodiacWheel({ highlightId }) {
 }
 
 function SignDetail({ sign }) {
+  const color = ELEMENT_COLORS[sign.element]
+
   return (
-    <div style={{ animation: 'slideUp 0.5s ease-out' }}>
-      {/* Header */}
+    <div className="animate-fade-up">
       <div
+        className="card-soft"
         style={{
-          borderRadius: 20,
-          padding: 20,
-          marginBottom: 16,
-          background: `linear-gradient(135deg, ${sign.colors[0]}20, ${sign.colors[1]}10)`,
-          border: `1px solid ${sign.colors[0]}40`,
+          padding: 20, marginBottom: 14,
+          background: `linear-gradient(135deg, ${color}10, #fefcf6)`,
+          borderLeft: `4px solid ${color}`,
         }}
       >
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 14 }}>
           <div style={{
-            width: 60, height: 60, borderRadius: '50%',
-            background: `linear-gradient(135deg, ${sign.colors[0]}, ${sign.colors[1]})`,
+            width: 64, height: 64, borderRadius: '50%',
+            background: color,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28, boxShadow: `0 8px 24px ${sign.colors[0]}50`,
+            fontSize: 32, color: '#fdf9f0',
+            boxShadow: `0 6px 16px ${color}40`,
           }}>
             {sign.symbol}
           </div>
           <div>
-            <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 22, color: '#f1f5f9', marginBottom: 4 }}>
+            <h2 className="serif" style={{ fontSize: 24, color: '#2d2618', marginBottom: 2 }}>
               {sign.name}
             </h2>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{sign.dates}</p>
+            <p style={{ fontSize: 11, color: '#8a7a5e', fontStyle: 'italic' }}>{sign.en}</p>
+            <p style={{ fontSize: 11, color: '#5a4a3a', marginTop: 4 }}>{sign.dates}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {[
-            { label: '元素', value: sign.element, icon: '🌊' },
-            { label: '主星', value: sign.ruler, icon: '🪐' },
-            { label: '类型', value: sign.quality, icon: '⚡' },
-          ].map(item => (
-            <div key={item.label} style={{
-              flex: 1, minWidth: 70,
-              background: 'rgba(255,255,255,0.05)',
-              borderRadius: 12, padding: '10px 12px',
-              textAlign: 'center',
-            }}>
-              <p style={{ fontSize: 14, marginBottom: 4 }}>{item.icon}</p>
-              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>{item.label}</p>
-              <p style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 600 }}>{item.value}</p>
-            </div>
-          ))}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 1, textAlign: 'center', padding: 10, background: 'rgba(255,255,255,0.7)', borderRadius: 10 }}>
+            <p style={{ fontSize: 9, color: '#8a7a5e', letterSpacing: '0.1em', marginBottom: 4 }}>元素</p>
+            <p style={{ fontSize: 13, color, fontWeight: 600 }}>{sign.element}</p>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', padding: 10, background: 'rgba(255,255,255,0.7)', borderRadius: 10 }}>
+            <p style={{ fontSize: 9, color: '#8a7a5e', letterSpacing: '0.1em', marginBottom: 4 }}>主星</p>
+            <p style={{ fontSize: 13, color: '#2d2618', fontWeight: 600 }}>{sign.ruler}</p>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', padding: 10, background: 'rgba(255,255,255,0.7)', borderRadius: 10 }}>
+            <p style={{ fontSize: 9, color: '#8a7a5e', letterSpacing: '0.1em', marginBottom: 4 }}>类型</p>
+            <p style={{ fontSize: 13, color: '#2d2618', fontWeight: 600 }}>{sign.quality}</p>
+          </div>
         </div>
       </div>
 
-      {/* Traits */}
-      <div className="glass" style={{ borderRadius: 16, padding: 16, marginBottom: 12 }}>
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, letterSpacing: '0.1em' }}>性格特质</p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="card-soft" style={{ padding: 16, marginBottom: 14 }}>
+        <p className="section-sub" style={{ marginBottom: 10 }}>性格特质</p>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {sign.traits.map(t => (
-            <span key={t} style={{
-              fontSize: 12, padding: '5px 12px',
-              background: `${sign.colors[0]}20`,
-              border: `1px solid ${sign.colors[0]}40`,
-              borderRadius: 20, color: sign.colors[0],
-            }}>{t}</span>
+            <span key={t} className="pill" style={{ background: `${color}15`, color }}>{t}</span>
           ))}
         </div>
       </div>
 
-      {/* Description */}
-      <div className="glass" style={{ borderRadius: 16, padding: 16, marginBottom: 12 }}>
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 10, letterSpacing: '0.1em' }}>星座解析</p>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.8 }}>{sign.description}</p>
+      <div className="card-soft" style={{ padding: 18, marginBottom: 14 }}>
+        <p className="section-sub" style={{ marginBottom: 10 }}>星座解析</p>
+        <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9 }}>{sign.description}</p>
       </div>
 
-      {/* Love & Career */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        {[
-          { title: '爱情运势', content: sign.love, icon: '♡' },
-          { title: '事业发展', content: sign.career, icon: '★' },
-        ].map(item => (
-          <div key={item.title} className="glass" style={{ borderRadius: 16, padding: 14 }}>
-            <p style={{ fontSize: 12, color: '#f59e0b', marginBottom: 8 }}>{item.icon} {item.title}</p>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>{item.content.slice(0, 60)}…</p>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+        <div className="card-soft" style={{ padding: 16 }}>
+          <p style={{ fontSize: 13, color: '#c4924a', marginBottom: 6, fontWeight: 600 }}>♡ 爱情运势</p>
+          <p style={{ fontSize: 11, color: '#5a4a3a', lineHeight: 1.7 }}>{sign.love}</p>
+        </div>
+        <div className="card-soft" style={{ padding: 16 }}>
+          <p style={{ fontSize: 13, color: '#2d4a3e', marginBottom: 6, fontWeight: 600 }}>★ 事业发展</p>
+          <p style={{ fontSize: 11, color: '#5a4a3a', lineHeight: 1.7 }}>{sign.career}</p>
+        </div>
       </div>
 
-      {/* Lucky */}
-      <div className="glass" style={{ borderRadius: 16, padding: 16, marginBottom: 12 }}>
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, letterSpacing: '0.1em' }}>幸运元素</p>
+      <div className="card-soft" style={{ padding: 16, marginBottom: 14 }}>
+        <p className="section-sub" style={{ marginBottom: 12 }}>幸运元素</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           {[
-            { label: '幸运数字', value: sign.lucky.number },
-            { label: '幸运颜色', value: sign.lucky.color },
-            { label: '守护宝石', value: sign.lucky.stone },
+            { label: '数字', value: sign.lucky.number },
+            { label: '颜色', value: sign.lucky.color },
+            { label: '宝石', value: sign.lucky.stone },
             { label: '幸运日', value: sign.lucky.day },
           ].map(item => (
-            <div key={item.label} style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', marginBottom: 3 }}>{item.value}</p>
-              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>{item.label}</p>
+            <div key={item.label} style={{ textAlign: 'center', background: '#fdf9f0', padding: '10px 4px', borderRadius: 10 }}>
+              <p className="serif" style={{ fontSize: 14, color: '#c4924a', marginBottom: 3 }}>{item.value}</p>
+              <p style={{ fontSize: 9, color: '#8a7a5e' }}>{item.label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Compatibility */}
-      <div className="glass" style={{ borderRadius: 16, padding: 16 }}>
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, letterSpacing: '0.1em' }}>最佳配对</p>
+      <div className="card-soft" style={{ padding: 16 }}>
+        <p className="section-sub" style={{ marginBottom: 12 }}>最佳配对</p>
         <div style={{ display: 'flex', gap: 10 }}>
           {sign.compatibility.map(comp => {
             const s = ZODIAC_SIGNS.find(z => z.name === comp)
+            const c = ELEMENT_COLORS[s?.element]
             return (
               <div key={comp} style={{
-                flex: 1, textAlign: 'center',
-                background: `${sign.colors[0]}10`,
-                borderRadius: 12, padding: '10px 8px',
-                border: `1px solid ${sign.colors[0]}25`,
+                flex: 1, textAlign: 'center', padding: '12px 6px',
+                background: `${c}10`, borderRadius: 12,
+                border: `1px solid ${c}30`,
               }}>
-                <p style={{ fontSize: 18, marginBottom: 4 }}>{s?.symbol || '⭐'}</p>
-                <p style={{ fontSize: 11, color: '#f1f5f9' }}>{comp}</p>
+                <p style={{ fontSize: 26, marginBottom: 4, color: c }}>{s?.symbol}</p>
+                <p style={{ fontSize: 11, color: '#2d2618', fontWeight: 500 }}>{comp}</p>
               </div>
             )
           })}
@@ -242,129 +229,105 @@ export default function Astrology() {
   const [day, setDay] = useState('')
   const [result, setResult] = useState(null)
   const [browsing, setBrowsing] = useState(null)
-  const [visible, setVisible] = useState(false)
 
   function handleSubmit(e) {
-    e.preventDefault()
+    e?.preventDefault()
     if (!month || !day) return
-    const signId = getZodiacByDate(month, day)
-    const sign = ZODIAC_SIGNS.find(s => s.id === signId)
-    setResult(sign)
-    setVisible(true)
+    const id = getZodiacByDate(month, day)
+    setResult(ZODIAC_SIGNS.find(s => s.id === id))
+    setBrowsing(null)
   }
 
-  const displaySign = result || browsing
+  const display = result || browsing
 
   return (
-    <div style={{ padding: '60px 20px 100px', maxWidth: 480, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <p style={{ fontSize: 11, letterSpacing: '0.15em', color: '#60a5fa', marginBottom: 8, textTransform: 'uppercase' }}>
-          ✦ Birth Chart ✦
-        </p>
-        <h1 style={{ fontFamily: 'Cinzel, serif', fontSize: 24, color: '#f1f5f9' }}>星座星盘</h1>
+    <div className="animate-fade-in pb-nav" style={{ padding: '40px 18px 0', maxWidth: 520, margin: '0 auto' }}>
+      <div style={{ paddingTop: 16, marginBottom: 24, textAlign: 'center' }}>
+        <p className="section-sub">ASTROLOGY</p>
+        <h1 className="serif" style={{ fontSize: 26, color: '#2d2618' }}>星座星盘</h1>
       </div>
 
-      {/* Wheel */}
-      <div style={{ marginBottom: 28 }}>
-        <ZodiacWheel highlightId={displaySign?.id} />
+      <div style={{ marginBottom: 24 }}>
+        <ZodiacWheel highlightId={display?.id} />
       </div>
 
-      {/* Input */}
-      <div className="glass" style={{ borderRadius: 20, padding: 20, marginBottom: 20 }}>
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>输入你的生日，解读你的星座</p>
+      <div className="card-soft" style={{ padding: 18, marginBottom: 20 }}>
+        <p style={{ fontSize: 12, color: '#5a4a3a', marginBottom: 14 }}>输入你的生日，解读你的太阳星座</p>
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
           <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>月份</label>
+            <label style={{ fontSize: 10, color: '#8a7a5e', display: 'block', marginBottom: 6 }}>月份</label>
             <input
-              type="number" min="1" max="12" placeholder="1-12"
+              type="number" min="1" max="12" inputMode="numeric"
               value={month}
               onChange={e => setMonth(e.target.value)}
+              placeholder="1-12"
               style={{
-                width: '100%', padding: '12px 14px',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 12, color: '#f1f5f9',
-                fontSize: 15, outline: 'none',
+                width: '100%', padding: '11px 14px',
+                background: '#fdf9f0',
+                border: '1px solid rgba(196,146,74,0.25)',
+                borderRadius: 10, color: '#2d2618',
               }}
             />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>日期</label>
+            <label style={{ fontSize: 10, color: '#8a7a5e', display: 'block', marginBottom: 6 }}>日期</label>
             <input
-              type="number" min="1" max="31" placeholder="1-31"
+              type="number" min="1" max="31" inputMode="numeric"
               value={day}
               onChange={e => setDay(e.target.value)}
+              placeholder="1-31"
               style={{
-                width: '100%', padding: '12px 14px',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 12, color: '#f1f5f9',
-                fontSize: 15, outline: 'none',
+                width: '100%', padding: '11px 14px',
+                background: '#fdf9f0',
+                border: '1px solid rgba(196,146,74,0.25)',
+                borderRadius: 10, color: '#2d2618',
               }}
             />
           </div>
-          <button
-            type="submit"
-            style={{
-              padding: '12px 20px',
-              background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
-              border: 'none', borderRadius: 12,
-              color: 'white', fontSize: 14, cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(14,165,233,0.35)',
-              flexShrink: 0,
-            }}
-          >
+          <button type="submit" className="btn-primary" style={{ padding: '11px 20px', whiteSpace: 'nowrap' }}>
             解析
           </button>
         </form>
       </div>
 
-      {/* Result */}
-      {displaySign && <SignDetail sign={displaySign} />}
-
-      {/* Browse all signs */}
-      {!displaySign && (
+      {display ? (
         <>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 14, letterSpacing: '0.08em', textAlign: 'center' }}>
-            — 或直接浏览十二星座 —
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-            {ZODIAC_SIGNS.map(sign => (
-              <button
-                key={sign.id}
-                onClick={() => setBrowsing(sign)}
-                style={{
-                  background: `${sign.colors[0]}15`,
-                  border: `1px solid ${sign.colors[0]}30`,
-                  borderRadius: 14, padding: '12px 8px',
-                  cursor: 'pointer', textAlign: 'center',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-              >
-                <p style={{ fontSize: 22, marginBottom: 4 }}>{sign.symbol}</p>
-                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>{sign.name}</p>
-              </button>
-            ))}
+          <SignDetail sign={display} />
+          <button
+            onClick={() => { setResult(null); setBrowsing(null); setMonth(''); setDay('') }}
+            className="btn-secondary"
+            style={{ width: '100%', marginTop: 16 }}
+          >
+            浏览其他星座
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="divider">— 或浏览十二星座 —</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+            {ZODIAC_SIGNS.map(sign => {
+              const color = ELEMENT_COLORS[sign.element]
+              return (
+                <button
+                  key={sign.id}
+                  onClick={() => setBrowsing(sign)}
+                  className="card-soft"
+                  style={{
+                    padding: '14px 6px',
+                    cursor: 'pointer', textAlign: 'center',
+                    border: 'none', background: '#ffffff',
+                  }}
+                >
+                  <p style={{ fontSize: 24, marginBottom: 4, color }}>{sign.symbol}</p>
+                  <p style={{ fontSize: 11, color: '#2d2618', fontWeight: 500 }}>{sign.name}</p>
+                </button>
+              )
+            })}
           </div>
         </>
       )}
 
-      {displaySign && (
-        <button
-          onClick={() => { setResult(null); setBrowsing(null) }}
-          style={{
-            width: '100%', marginTop: 16, padding: 14,
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 14, color: 'rgba(255,255,255,0.5)',
-            fontSize: 13, cursor: 'pointer',
-          }}
-        >
-          浏览其他星座
-        </button>
-      )}
+      <div style={{ height: 60 }} />
     </div>
   )
 }
