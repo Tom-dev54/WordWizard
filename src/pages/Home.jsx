@@ -25,10 +25,30 @@ const MOON_PHASES = [
   { icon: '🌘', name: '残月',   hint: '休息、反思与内观' },
 ]
 
-function useDailyCard() {
-  // Stable daily card based on date
+const DAILY_INTENTIONS = [
+  { text: '今天，我选择放下评判，以开放的心接纳一切', element: '风', color: '#c4924a' },
+  { text: '今天，我专注于内心的力量，而非外在的噪音', element: '火', color: '#c44a3e' },
+  { text: '今天，我允许自己柔软，因为温柔也是一种力量', element: '水', color: '#3e6c8c' },
+  { text: '今天，我选择活在当下，感受每一刻的礼物', element: '土', color: '#5c7a3e' },
+  { text: '今天，我相信宇宙的安排，即便现在看不明白', element: '风', color: '#c4924a' },
+  { text: '今天，我感恩所拥有的，而非专注于缺失', element: '土', color: '#5c7a3e' },
+  { text: '今天，我是自己情绪的见证者，而非奴隶', element: '水', color: '#3e6c8c' },
+]
+
+const DAILY_ELEMENTS = [
+  { zh: '火', en: 'FIRE', color: '#c44a3e', icon: '🔥', hint: '行动力旺盛，勇敢迈步' },
+  { zh: '水', en: 'WATER', color: '#3e6c8c', icon: '💧', hint: '情感敏锐，内省良时' },
+  { zh: '风', en: 'AIR', color: '#c4924a', icon: '🌬', hint: '思维活跃，沟通畅通' },
+  { zh: '土', en: 'EARTH', color: '#5c7a3e', icon: '🌿', hint: '稳健踏实，专注细节' },
+]
+
+function useDailySeed() {
   const today = new Date()
-  const seed = today.getFullYear() * 1000 + today.getMonth() * 50 + today.getDate()
+  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate()
+}
+
+function useDailyCard() {
+  const seed = useDailySeed()
   const idx = seed % MAJOR_ARCANA.length
   return MAJOR_ARCANA[idx]
 }
@@ -40,7 +60,10 @@ function DailyCard({ onSave }) {
   const dateLabel = today.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
 
   return (
-    <div className="card-soft" style={{ padding: 24, marginBottom: 20 }}>
+    <div className="card-soft" style={{
+      padding: 24, marginBottom: 16,
+      background: 'linear-gradient(145deg, #ffffff, #fefcf6)',
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
           <p className="section-sub">DAILY DRAW</p>
@@ -77,7 +100,7 @@ function DailyCard({ onSave }) {
               </button>
             </>
           ) : (
-            <>
+            <div className="animate-fade-up">
               <h3 className="serif" style={{ fontSize: 20, color: '#2d2618', marginBottom: 4 }}>
                 {card.nameCN}
               </h3>
@@ -90,19 +113,19 @@ function DailyCard({ onSave }) {
                 ))}
               </div>
               <p style={{ fontSize: 12, color: '#5a4a3a', lineHeight: 1.7 }}>
-                {card.uprightMeaning.slice(0, 50)}…
+                {card.uprightMeaning.slice(0, 55)}…
               </p>
-            </>
+            </div>
           )}
         </div>
       </div>
 
       {revealed && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <div style={{ marginTop: 16 }}>
           <button
             className="btn-secondary"
-            style={{ flex: 1, fontSize: 12, padding: '10px 14px' }}
-            onClick={() => { onSave(card); }}
+            style={{ width: '100%', fontSize: 12, padding: '10px 14px' }}
+            onClick={() => { onSave(card) }}
           >
             ✦ 记入日志
           </button>
@@ -112,38 +135,117 @@ function DailyCard({ onSave }) {
   )
 }
 
-function MoonPhaseCard() {
-  const day = new Date().getDate()
-  const idx = Math.floor((day % 30) / 4)
-  const phase = MOON_PHASES[idx]
+function DailyIntention() {
+  const seed = useDailySeed()
+  const intention = DAILY_INTENTIONS[seed % DAILY_INTENTIONS.length]
+  const [tapped, setTapped] = useState(false)
+
+  return (
+    <div
+      className="card-tinted"
+      onClick={() => setTapped(!tapped)}
+      style={{
+        padding: 18, marginBottom: 16,
+        cursor: 'pointer',
+        borderLeft: `3px solid ${intention.color}`,
+        transition: 'all 0.3s ease',
+        background: `linear-gradient(135deg, ${intention.color}06, #fefcf6)`,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <p className="section-sub" style={{ marginBottom: 6 }}>TODAY'S INTENTION</p>
+          <p className="serif" style={{
+            fontSize: 14, color: '#2d2618', lineHeight: 1.7,
+          }}>
+            {intention.text}
+          </p>
+        </div>
+        <div style={{
+          width: 32, height: 32, borderRadius: '50%', marginLeft: 12, flexShrink: 0,
+          background: tapped ? intention.color : 'transparent',
+          border: `2px solid ${intention.color}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all 0.3s ease',
+          color: tapped ? '#fff' : intention.color, fontSize: 14,
+        }}>
+          {tapped ? '✓' : '○'}
+        </div>
+      </div>
+      {tapped && (
+        <div style={{
+          marginTop: 12, paddingTop: 12,
+          borderTop: `1px solid ${intention.color}20`,
+          animation: 'fade-up 0.3s ease-out',
+        }}>
+          <p style={{ fontSize: 11, color: '#8a7a5e' }}>
+            {intention.element}元素能量已激活 · 带着这个意图开始你美好的一天 ✦
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CosmicEnergy() {
+  const seed = useDailySeed()
+  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000)
+  const el = DAILY_ELEMENTS[dayOfYear % 4]
+  const phase = MOON_PHASES[Math.floor((new Date().getDate() % 30) / 4)]
   const quote = DAILY_QUOTES[new Date().getDay()]
 
   return (
-    <div className="card-tinted" style={{ padding: 20, marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
-        <div style={{
-          width: 56, height: 56, borderRadius: '50%',
-          background: 'radial-gradient(circle at 30% 30%, #faf4e8, #c4924a)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 28, flexShrink: 0,
-          boxShadow: '0 4px 16px rgba(196,146,74,0.25)',
-        }}>
-          {phase.icon}
+    <div style={{ marginBottom: 16 }}>
+      {/* Moon + Element row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        {/* Moon phase */}
+        <div className="card-soft" style={{ padding: 16 }}>
+          <p className="section-sub" style={{ marginBottom: 6, fontSize: 9 }}>MOON PHASE</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 28 }}>{phase.icon}</span>
+            <div>
+              <p className="serif" style={{ fontSize: 15, color: '#2d2618' }}>{phase.name}</p>
+              <p style={{ fontSize: 10, color: '#8a7a5e', lineHeight: 1.4, marginTop: 2 }}>{phase.hint}</p>
+            </div>
+          </div>
         </div>
-        <div>
-          <p className="section-sub">CURRENT MOON</p>
-          <p className="serif" style={{ fontSize: 18, color: '#2d2618', marginBottom: 2 }}>
-            {phase.name}
-          </p>
-          <p style={{ fontSize: 11, color: '#8a7a5e' }}>{phase.hint}</p>
+
+        {/* Daily element */}
+        <div className="card-soft" style={{
+          padding: 16,
+          background: `linear-gradient(135deg, ${el.color}10, #ffffff)`,
+        }}>
+          <p className="section-sub" style={{ marginBottom: 6, fontSize: 9 }}>TODAY'S ELEMENT</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: el.color,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, flexShrink: 0,
+              animation: 'pulse-soft 3s ease-in-out infinite',
+            }}>
+              {el.icon}
+            </div>
+            <div>
+              <p className="serif" style={{ fontSize: 15, color: el.color, fontWeight: 600 }}>
+                {el.zh}元素
+              </p>
+              <p style={{ fontSize: 10, color: '#8a7a5e', lineHeight: 1.4, marginTop: 2 }}>{el.hint}</p>
+            </div>
+          </div>
         </div>
       </div>
-      <div style={{
-        background: 'rgba(196,146,74,0.08)',
-        borderRadius: 12, padding: 12,
+
+      {/* Daily cosmic quote */}
+      <div className="card-tinted" style={{
+        padding: 16,
         borderLeft: '3px solid #c4924a',
+        background: 'rgba(196,146,74,0.05)',
       }}>
-        <p style={{ fontSize: 12, color: '#5a4a3a', lineHeight: 1.7, fontStyle: 'italic' }}>
+        <p style={{ fontSize: 11, color: '#c4924a', letterSpacing: '0.15em', marginBottom: 8, fontWeight: 600 }}>
+          ✦ 宇宙低语
+        </p>
+        <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.8, fontStyle: 'italic' }}>
           "{quote}"
         </p>
       </div>
@@ -151,10 +253,10 @@ function MoonPhaseCard() {
   )
 }
 
-function RecentJournal({ entries, onNavigate }) {
+function RecentJournal({ entries }) {
   if (entries.length === 0) {
     return (
-      <div className="card-tinted" style={{ padding: 20, marginBottom: 20, textAlign: 'center' }}>
+      <div className="card-tinted" style={{ padding: 20, marginBottom: 16, textAlign: 'center' }}>
         <p style={{ fontSize: 26, marginBottom: 8 }}>📖</p>
         <p className="serif" style={{ fontSize: 15, color: '#2d2618', marginBottom: 6 }}>
           你的塔罗日志还是空的
@@ -167,7 +269,7 @@ function RecentJournal({ entries, onNavigate }) {
   }
 
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10, padding: '0 4px' }}>
         <p className="section-sub">RECENT JOURNAL</p>
         <span style={{ fontSize: 11, color: '#8a7a5e' }}>{entries.length} 条记录</span>
@@ -208,7 +310,7 @@ function QuickActions({ onNavigate }) {
     { icon: '💬', label: '社区', sub: '交流分享', page: 'community' },
   ]
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
       {actions.map(a => (
         <button
           key={a.page}
@@ -218,8 +320,10 @@ function QuickActions({ onNavigate }) {
             border: '1px solid rgba(196,146,74,0.18)',
             borderRadius: 14, padding: '14px 6px',
             cursor: 'pointer', textAlign: 'center',
-            transition: 'all 0.2s ease',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           }}
+          onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.94)'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(45,38,24,0.08)' }}
+          onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '' }}
         >
           <div style={{ fontSize: 22, marginBottom: 4 }}>{a.icon}</div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#2d2618', marginBottom: 2 }}>{a.label}</div>
@@ -231,7 +335,7 @@ function QuickActions({ onNavigate }) {
 }
 
 export default function Home({ onNavigate }) {
-  const [user, setUser] = useState(getUser())
+  const [user] = useState(getUser())
   const [journal, setJournal] = useState(getJournal())
 
   useEffect(() => {
@@ -257,8 +361,8 @@ export default function Home({ onNavigate }) {
 
   return (
     <div className="animate-fade-in" style={{ padding: '40px 18px 0', maxWidth: 520, margin: '0 auto' }}>
-      {/* Header with mascot */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, paddingTop: 16 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingTop: 16 }}>
         <div>
           <p style={{ fontSize: 11, color: '#8a7a5e', letterSpacing: '0.15em', marginBottom: 4 }}>
             {greeting.toUpperCase()}
@@ -278,9 +382,10 @@ export default function Home({ onNavigate }) {
       </div>
 
       <DailyCard onSave={handleSaveDaily} />
-      <MoonPhaseCard />
+      <DailyIntention />
       <QuickActions onNavigate={onNavigate} />
-      <RecentJournal entries={journal} onNavigate={onNavigate} />
+      <CosmicEnergy />
+      <RecentJournal entries={journal} />
 
       {/* Footer brand */}
       <div style={{ textAlign: 'center', padding: '20px 0 100px' }}>

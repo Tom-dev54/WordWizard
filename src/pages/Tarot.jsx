@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MAJOR_ARCANA, SPREADS } from '../data/tarotCards'
 import { CardFace, CardBack } from '../components/TarotCardArt'
 import { saveReading } from '../utils/storage'
+import Sheet from '../components/Sheet'
 
 function drawCards(count) {
   const shuffled = [...MAJOR_ARCANA].sort(() => Math.random() - 0.5)
@@ -12,16 +13,11 @@ function drawCards(count) {
 }
 
 function TarotCard({ card, reversed, position, flipped, onClick, narrow }) {
-  const w = narrow ? 90 : 120
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div
         className={`scene ${flipped ? 'flipped' : ''}`}
-        style={{
-          width: '100%',
-          aspectRatio: '2/3',
-          cursor: flipped ? 'pointer' : 'pointer',
-        }}
+        style={{ width: '100%', aspectRatio: '2/3', cursor: 'pointer' }}
         onClick={onClick}
       >
         <div className="card-3d">
@@ -48,65 +44,66 @@ function TarotCard({ card, reversed, position, flipped, onClick, narrow }) {
 function CardDetailSheet({ card, reversed, onClose }) {
   if (!card) return null
   return (
-    <div className="sheet" onClick={onClose}>
-      <div className="sheet-content" onClick={e => e.stopPropagation()}>
-        <div className="sheet-handle" />
-
-        <div style={{ display: 'flex', gap: 18, marginBottom: 20 }}>
-          <div style={{ width: 90, height: 140, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}>
-            <CardFace card={card} reversed={reversed} />
-          </div>
-          <div style={{ paddingTop: 6 }}>
-            <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.2em', marginBottom: 6 }}>
-              {card.number}
-            </p>
-            <h2 className="serif" style={{ fontSize: 24, color: '#2d2618', marginBottom: 2 }}>
-              {card.nameCN}
-            </h2>
-            <p style={{ fontSize: 12, color: '#8a7a5e', fontStyle: 'italic', marginBottom: 12 }}>
-              {card.name}
-            </p>
-            {reversed && (
-              <span className="pill pill-wine">逆位 · Reversed</span>
-            )}
-            <div style={{ display: 'flex', gap: 8, marginTop: 12, fontSize: 11, color: '#5a4a3a' }}>
-              <span>🜂 {card.element}</span>
-              <span style={{ color: '#c4924a' }}>·</span>
-              <span>🪐 {card.planet}</span>
+    <Sheet onClose={onClose}>
+      {(dismiss) => (
+        <>
+          <div className="sheet-handle" />
+          <div style={{ display: 'flex', gap: 18, marginBottom: 20 }}>
+            <div style={{ width: 90, height: 140, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}>
+              <CardFace card={card} reversed={reversed} />
+            </div>
+            <div style={{ paddingTop: 6 }}>
+              <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.2em', marginBottom: 6 }}>
+                {card.number}
+              </p>
+              <h2 className="serif" style={{ fontSize: 24, color: '#2d2618', marginBottom: 2 }}>
+                {card.nameCN}
+              </h2>
+              <p style={{ fontSize: 12, color: '#8a7a5e', fontStyle: 'italic', marginBottom: 12 }}>
+                {card.name}
+              </p>
+              {reversed && (
+                <span className="pill pill-wine">逆位 · Reversed</span>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, fontSize: 11, color: '#5a4a3a' }}>
+                <span>🜂 {card.element}</span>
+                <span style={{ color: '#c4924a' }}>·</span>
+                <span>🪐 {card.planet}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div style={{ marginBottom: 18 }}>
-          <p className="section-sub" style={{ marginBottom: 8 }}>关键词</p>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {card.keywords.map(k => (
-              <span key={k} className="pill pill-forest">{k}</span>
-            ))}
+          <div style={{ marginBottom: 18 }}>
+            <p className="section-sub" style={{ marginBottom: 8 }}>关键词</p>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {card.keywords.map(k => (
+                <span key={k} className="pill pill-forest">{k}</span>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div style={{
-          background: reversed ? 'rgba(140,74,94,0.06)' : 'rgba(45,74,62,0.06)',
-          borderRadius: 14, padding: 16, marginBottom: 14,
-          borderLeft: `3px solid ${reversed ? '#8c4a5e' : '#2d4a3e'}`,
-        }}>
-          <p style={{
-            fontSize: 11, color: reversed ? '#6e3848' : '#2d4a3e',
-            letterSpacing: '0.15em', marginBottom: 10, fontWeight: 600,
+          <div style={{
+            background: reversed ? 'rgba(140,74,94,0.06)' : 'rgba(45,74,62,0.06)',
+            borderRadius: 14, padding: 16, marginBottom: 14,
+            borderLeft: `3px solid ${reversed ? '#8c4a5e' : '#2d4a3e'}`,
           }}>
-            {reversed ? '▽ 逆位解读' : '△ 正位解读'}
-          </p>
-          <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.8 }}>
-            {reversed ? card.reversedMeaning : card.uprightMeaning}
-          </p>
-        </div>
+            <p style={{
+              fontSize: 11, color: reversed ? '#6e3848' : '#2d4a3e',
+              letterSpacing: '0.15em', marginBottom: 10, fontWeight: 600,
+            }}>
+              {reversed ? '▽ 逆位解读' : '△ 正位解读'}
+            </p>
+            <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.8 }}>
+              {reversed ? card.reversedMeaning : card.uprightMeaning}
+            </p>
+          </div>
 
-        <button onClick={onClose} className="btn-primary" style={{ width: '100%' }}>
-          收起解读
-        </button>
-      </div>
-    </div>
+          <button onClick={dismiss} className="btn-primary" style={{ width: '100%' }}>
+            收起解读
+          </button>
+        </>
+      )}
+    </Sheet>
   )
 }
 
@@ -114,76 +111,80 @@ function SaveJournalSheet({ spread, cards, onClose, onSaved }) {
   const [note, setNote] = useState('')
   const [question, setQuestion] = useState('')
 
-  function handleSave() {
-    saveReading({
-      type: 'spread',
-      spreadName: spread.name,
-      spreadId: spread.id,
-      question,
-      note,
-      cards: cards.map((c, i) => ({
-        cardId: c.card.id,
-        cardName: c.card.nameCN,
-        reversed: c.reversed,
-        position: spread.positions[i],
-      })),
-    })
-    onSaved()
-  }
-
   return (
-    <div className="sheet" onClick={onClose}>
-      <div className="sheet-content" onClick={e => e.stopPropagation()}>
-        <div className="sheet-handle" />
-        <h3 className="serif" style={{ fontSize: 20, color: '#2d2618', marginBottom: 4 }}>记入日志</h3>
-        <p style={{ fontSize: 12, color: '#8a7a5e', marginBottom: 18 }}>
-          保存这次占卜，方便日后回顾与思考
-        </p>
+    <Sheet onClose={onClose}>
+      {(dismiss) => {
+        function handleSave() {
+          saveReading({
+            type: 'spread',
+            spreadName: spread.name,
+            spreadId: spread.id,
+            question,
+            note,
+            cards: cards.map((c, i) => ({
+              cardId: c.card.id,
+              cardName: c.card.nameCN,
+              reversed: c.reversed,
+              position: spread.positions[i],
+            })),
+          })
+          onSaved()
+          dismiss()
+        }
 
-        <label style={{ display: 'block', marginBottom: 14 }}>
-          <span style={{ fontSize: 11, color: '#5a4a3a', display: 'block', marginBottom: 6 }}>问题（可选）</span>
-          <input
-            value={question}
-            onChange={e => setQuestion(e.target.value)}
-            placeholder="此次占卜你想问什么？"
-            style={{
-              width: '100%', padding: '12px 14px',
-              background: '#fff',
-              border: '1px solid rgba(196,146,74,0.25)',
-              borderRadius: 12, color: '#2d2618',
-              fontSize: 14,
-            }}
-          />
-        </label>
+        return (
+          <>
+            <div className="sheet-handle" />
+            <h3 className="serif" style={{ fontSize: 20, color: '#2d2618', marginBottom: 4 }}>记入日志</h3>
+            <p style={{ fontSize: 12, color: '#8a7a5e', marginBottom: 18 }}>
+              保存这次占卜，方便日后回顾与思考
+            </p>
 
-        <label style={{ display: 'block', marginBottom: 18 }}>
-          <span style={{ fontSize: 11, color: '#5a4a3a', display: 'block', marginBottom: 6 }}>笔记（可选）</span>
-          <textarea
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            placeholder="记录你的感受、想法或解读…"
-            rows={4}
-            style={{
-              width: '100%', padding: '12px 14px',
-              background: '#fff',
-              border: '1px solid rgba(196,146,74,0.25)',
-              borderRadius: 12, color: '#2d2618',
-              fontSize: 13, lineHeight: 1.7, resize: 'none',
-            }}
-          />
-        </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={{ fontSize: 11, color: '#5a4a3a', display: 'block', marginBottom: 6 }}>问题（可选）</span>
+              <input
+                value={question}
+                onChange={e => setQuestion(e.target.value)}
+                placeholder="此次占卜你想问什么？"
+                style={{
+                  width: '100%', padding: '12px 14px',
+                  background: '#fff',
+                  border: '1px solid rgba(196,146,74,0.25)',
+                  borderRadius: 12, color: '#2d2618', fontSize: 14,
+                }}
+              />
+            </label>
 
-        <button onClick={handleSave} className="btn-primary" style={{ width: '100%', marginBottom: 8 }}>
-          ✦ 保存到日志
-        </button>
-        <button onClick={onClose} style={{
-          width: '100%', background: 'none', border: 'none',
-          padding: 10, color: '#8a7a5e', fontSize: 12, cursor: 'pointer',
-        }}>
-          取消
-        </button>
-      </div>
-    </div>
+            <label style={{ display: 'block', marginBottom: 18 }}>
+              <span style={{ fontSize: 11, color: '#5a4a3a', display: 'block', marginBottom: 6 }}>笔记（可选）</span>
+              <textarea
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder="记录你的感受、想法或解读…"
+                rows={4}
+                style={{
+                  width: '100%', padding: '12px 14px',
+                  background: '#fff',
+                  border: '1px solid rgba(196,146,74,0.25)',
+                  borderRadius: 12, color: '#2d2618',
+                  fontSize: 13, lineHeight: 1.7, resize: 'none',
+                }}
+              />
+            </label>
+
+            <button onClick={handleSave} className="btn-primary" style={{ width: '100%', marginBottom: 8 }}>
+              ✦ 保存到日志
+            </button>
+            <button onClick={dismiss} style={{
+              width: '100%', background: 'none', border: 'none',
+              padding: 10, color: '#8a7a5e', fontSize: 12, cursor: 'pointer',
+            }}>
+              取消
+            </button>
+          </>
+        )
+      }}
+    </Sheet>
   )
 }
 
@@ -220,7 +221,6 @@ export default function Tarot() {
   }
 
   function handleSaved() {
-    setShowSave(false)
     setSavedToast(true)
     setTimeout(() => setSavedToast(false), 2000)
   }
@@ -249,8 +249,10 @@ export default function Tarot() {
                   padding: 18, cursor: 'pointer',
                   border: 'none', textAlign: 'left',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  background: '#ffffff',
+                  background: '#ffffff', transition: 'transform 0.15s ease',
                 }}
+                onTouchStart={e => e.currentTarget.style.transform = 'scale(0.98)'}
+                onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
               >
                 <div>
                   <p className="serif" style={{ fontSize: 17, color: '#2d2618', marginBottom: 4 }}>{s.name}</p>
@@ -361,7 +363,10 @@ export default function Tarot() {
                     display: 'flex', gap: 12, alignItems: 'center',
                     cursor: 'pointer', border: 'none', textAlign: 'left',
                     animation: `fade-up 0.5s ease-out ${i * 0.1}s both`,
+                    transition: 'transform 0.15s ease',
                   }}
+                  onTouchStart={e => e.currentTarget.style.transform = 'scale(0.98)'}
+                  onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
                   <div style={{ width: 50, height: 78, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
                     <CardFace card={d.card} reversed={d.reversed} />
@@ -402,7 +407,11 @@ export default function Tarot() {
         <CardDetailSheet card={detail.card} reversed={detail.reversed} onClose={() => setDetail(null)} />
       )}
       {showSave && (
-        <SaveJournalSheet spread={spread} cards={drawn} onClose={() => setShowSave(false)} onSaved={handleSaved} />
+        <SaveJournalSheet
+          spread={spread} cards={drawn}
+          onClose={() => setShowSave(false)}
+          onSaved={handleSaved}
+        />
       )}
       {savedToast && (
         <div style={{

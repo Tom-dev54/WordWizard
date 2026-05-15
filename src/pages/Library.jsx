@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MAJOR_ARCANA } from '../data/tarotCards'
 import { ZODIAC_SIGNS } from '../data/zodiacData'
 import { CardFace } from '../components/TarotCardArt'
+import Sheet from '../components/Sheet'
 
 const LESSONS = [
   {
@@ -62,6 +63,7 @@ function CardLibrary() {
               background: filter === el ? '#2d4a3e' : '#fdf9f0',
               color: filter === el ? '#fdf9f0' : '#5a4a3a',
               fontWeight: filter === el ? 600 : 400,
+              transition: 'all 0.2s ease',
             }}
           >
             {el === 'all' ? '全部' : `${el}元素`}
@@ -74,11 +76,12 @@ function CardLibrary() {
           <button
             key={card.id}
             onClick={() => setSelected(card)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-            }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
           >
-            <div style={{ width: '100%', aspectRatio: '2/3', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px rgba(45,38,24,0.1)' }}>
+            <div style={{ width: '100%', aspectRatio: '2/3', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px rgba(45,38,24,0.1)', transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
+              onTouchStart={e => e.currentTarget.style.transform = 'scale(0.97)'}
+              onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
               <CardFace card={card} />
             </div>
             <p style={{ fontSize: 10, color: '#5a4a3a', marginTop: 6, textAlign: 'center', fontWeight: 500 }}>
@@ -89,36 +92,38 @@ function CardLibrary() {
       </div>
 
       {selected && (
-        <div className="sheet" onClick={() => setSelected(null)}>
-          <div className="sheet-content" onClick={e => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div style={{ display: 'flex', gap: 18, marginBottom: 20 }}>
-              <div style={{ width: 100, height: 156, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}>
-                <CardFace card={selected} />
-              </div>
-              <div style={{ paddingTop: 4 }}>
-                <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.2em', marginBottom: 4 }}>{selected.number}</p>
-                <h2 className="serif" style={{ fontSize: 24, color: '#2d2618', marginBottom: 2 }}>{selected.nameCN}</h2>
-                <p style={{ fontSize: 12, color: '#8a7a5e', fontStyle: 'italic', marginBottom: 12 }}>{selected.name}</p>
-                <div style={{ fontSize: 11, color: '#5a4a3a' }}>
-                  🜂 {selected.element} · 🪐 {selected.planet}
+        <Sheet onClose={() => setSelected(null)}>
+          {(dismiss) => (
+            <>
+              <div className="sheet-handle" />
+              <div style={{ display: 'flex', gap: 18, marginBottom: 20 }}>
+                <div style={{ width: 100, height: 156, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}>
+                  <CardFace card={selected} />
+                </div>
+                <div style={{ paddingTop: 4 }}>
+                  <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.2em', marginBottom: 4 }}>{selected.number}</p>
+                  <h2 className="serif" style={{ fontSize: 24, color: '#2d2618', marginBottom: 2 }}>{selected.nameCN}</h2>
+                  <p style={{ fontSize: 12, color: '#8a7a5e', fontStyle: 'italic', marginBottom: 12 }}>{selected.name}</p>
+                  <div style={{ fontSize: 11, color: '#5a4a3a' }}>
+                    🜂 {selected.element} · 🪐 {selected.planet}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-              {selected.keywords.map(k => <span key={k} className="pill pill-forest">{k}</span>)}
-            </div>
-            <div style={{ background: 'rgba(45,74,62,0.06)', borderRadius: 12, padding: 14, marginBottom: 10, borderLeft: '3px solid #2d4a3e' }}>
-              <p style={{ fontSize: 11, color: '#2d4a3e', marginBottom: 6, fontWeight: 600 }}>△ 正位</p>
-              <p style={{ fontSize: 12, color: '#3d3327', lineHeight: 1.7 }}>{selected.uprightMeaning}</p>
-            </div>
-            <div style={{ background: 'rgba(140,74,94,0.06)', borderRadius: 12, padding: 14, marginBottom: 16, borderLeft: '3px solid #8c4a5e' }}>
-              <p style={{ fontSize: 11, color: '#6e3848', marginBottom: 6, fontWeight: 600 }}>▽ 逆位</p>
-              <p style={{ fontSize: 12, color: '#3d3327', lineHeight: 1.7 }}>{selected.reversedMeaning}</p>
-            </div>
-            <button onClick={() => setSelected(null)} className="btn-primary" style={{ width: '100%' }}>关闭</button>
-          </div>
-        </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                {selected.keywords.map(k => <span key={k} className="pill pill-forest">{k}</span>)}
+              </div>
+              <div style={{ background: 'rgba(45,74,62,0.06)', borderRadius: 12, padding: 14, marginBottom: 10, borderLeft: '3px solid #2d4a3e' }}>
+                <p style={{ fontSize: 11, color: '#2d4a3e', marginBottom: 6, fontWeight: 600 }}>△ 正位</p>
+                <p style={{ fontSize: 12, color: '#3d3327', lineHeight: 1.7 }}>{selected.uprightMeaning}</p>
+              </div>
+              <div style={{ background: 'rgba(140,74,94,0.06)', borderRadius: 12, padding: 14, marginBottom: 16, borderLeft: '3px solid #8c4a5e' }}>
+                <p style={{ fontSize: 11, color: '#6e3848', marginBottom: 6, fontWeight: 600 }}>▽ 逆位</p>
+                <p style={{ fontSize: 12, color: '#3d3327', lineHeight: 1.7 }}>{selected.reversedMeaning}</p>
+              </div>
+              <button onClick={dismiss} className="btn-primary" style={{ width: '100%' }}>关闭</button>
+            </>
+          )}
+        </Sheet>
       )}
     </div>
   )
@@ -136,7 +141,9 @@ function ZodiacLibrary() {
             key={sign.id}
             onClick={() => setSelected(sign)}
             className="card-soft"
-            style={{ padding: 14, border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            style={{ padding: 14, border: 'none', cursor: 'pointer', textAlign: 'left', transition: 'transform 0.15s ease' }}
+            onTouchStart={e => e.currentTarget.style.transform = 'scale(0.97)'}
+            onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
           >
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <div style={{
@@ -153,28 +160,30 @@ function ZodiacLibrary() {
         )
       })}
       {selected && (
-        <div className="sheet" onClick={() => setSelected(null)}>
-          <div className="sheet-content" onClick={e => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div style={{ display: 'flex', gap: 14, marginBottom: 18 }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%',
-                background: ELEMENT_COLORS[selected.element], color: '#fdf9f0',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 32, flexShrink: 0,
-              }}>{selected.symbol}</div>
-              <div>
-                <h2 className="serif" style={{ fontSize: 22, color: '#2d2618' }}>{selected.name}</h2>
-                <p style={{ fontSize: 11, color: '#8a7a5e', fontStyle: 'italic' }}>{selected.en}</p>
-                <p style={{ fontSize: 11, color: '#5a4a3a', marginTop: 4 }}>{selected.dates}</p>
+        <Sheet onClose={() => setSelected(null)}>
+          {(dismiss) => (
+            <>
+              <div className="sheet-handle" />
+              <div style={{ display: 'flex', gap: 14, marginBottom: 18 }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: '50%',
+                  background: ELEMENT_COLORS[selected.element], color: '#fdf9f0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 32, flexShrink: 0,
+                }}>{selected.symbol}</div>
+                <div>
+                  <h2 className="serif" style={{ fontSize: 22, color: '#2d2618' }}>{selected.name}</h2>
+                  <p style={{ fontSize: 11, color: '#8a7a5e', fontStyle: 'italic' }}>{selected.en}</p>
+                  <p style={{ fontSize: 11, color: '#5a4a3a', marginTop: 4 }}>{selected.dates}</p>
+                </div>
               </div>
-            </div>
-            <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9, marginBottom: 16 }}>
-              {selected.description}
-            </p>
-            <button onClick={() => setSelected(null)} className="btn-primary" style={{ width: '100%' }}>关闭</button>
-          </div>
-        </div>
+              <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9, marginBottom: 16 }}>
+                {selected.description}
+              </p>
+              <button onClick={dismiss} className="btn-primary" style={{ width: '100%' }}>关闭</button>
+            </>
+          )}
+        </Sheet>
       )}
     </div>
   )
@@ -193,7 +202,10 @@ function LessonLibrary() {
             width: '100%', padding: 16, marginBottom: 10,
             display: 'flex', alignItems: 'center', gap: 14,
             border: 'none', cursor: 'pointer', textAlign: 'left',
+            transition: 'transform 0.15s ease',
           }}
+          onTouchStart={e => e.currentTarget.style.transform = 'scale(0.98)'}
+          onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
         >
           <div style={{
             width: 48, height: 48, borderRadius: 12,
@@ -212,22 +224,24 @@ function LessonLibrary() {
         </button>
       ))}
       {selected && (
-        <div className="sheet" onClick={() => setSelected(null)}>
-          <div className="sheet-content" onClick={e => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
-              <span style={{ fontSize: 36 }}>{selected.emoji}</span>
-              <div>
-                <span className="pill pill-gold" style={{ fontSize: 9 }}>{selected.level}</span>
-                <h2 className="serif" style={{ fontSize: 19, color: '#2d2618', marginTop: 4 }}>{selected.title}</h2>
+        <Sheet onClose={() => setSelected(null)}>
+          {(dismiss) => (
+            <>
+              <div className="sheet-handle" />
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+                <span style={{ fontSize: 36 }}>{selected.emoji}</span>
+                <div>
+                  <span className="pill pill-gold" style={{ fontSize: 9 }}>{selected.level}</span>
+                  <h2 className="serif" style={{ fontSize: 19, color: '#2d2618', marginTop: 4 }}>{selected.title}</h2>
+                </div>
               </div>
-            </div>
-            <div style={{ fontSize: 13, color: '#3d3327', lineHeight: 2, whiteSpace: 'pre-line', marginBottom: 18 }}>
-              {selected.content}
-            </div>
-            <button onClick={() => setSelected(null)} className="btn-primary" style={{ width: '100%' }}>读完了</button>
-          </div>
-        </div>
+              <div style={{ fontSize: 13, color: '#3d3327', lineHeight: 2, whiteSpace: 'pre-line', marginBottom: 18 }}>
+                {selected.content}
+              </div>
+              <button onClick={dismiss} className="btn-primary" style={{ width: '100%' }}>读完了</button>
+            </>
+          )}
+        </Sheet>
       )}
     </div>
   )
