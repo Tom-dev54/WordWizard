@@ -4,10 +4,12 @@ import {
   getPosts, addPost, toggleLike, deletePost,
   getComments, addComment,
   getUser, updateUser, AVATARS, relTime,
+  getSavedPosts, toggleSavePost,
 } from '../utils/storage'
 import Sheet from '../components/Sheet'
+import { tap } from '../utils/haptics'
 
-function PostCard({ post, onOpen, onLike }) {
+function PostCard({ post, onOpen, onLike, onSave, saved }) {
   const user = getUser()
   const isMine = post.authorId === user.id
   return (
@@ -74,8 +76,15 @@ function PostCard({ post, onOpen, onLike }) {
         <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#8a7a5e', fontSize: 12 }}>
           ☉ {post.comments}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#8a7a5e', fontSize: 12 }}>
-          ✦ {post.saves}
+        <span
+          onClick={(e) => { e.stopPropagation(); tap(); onSave(post.id) }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5, fontSize: 12,
+            color: saved ? '#c4924a' : '#8a7a5e', cursor: 'pointer',
+            marginLeft: 'auto',
+          }}
+        >
+          {saved ? '★' : '☆'} 收藏
         </span>
       </div>
     </button>
@@ -378,7 +387,9 @@ function ProfileSheet({ onClose }) {
 export default function Community() {
   const [posts, setPosts] = useState(getPosts())
   const [activeCategory, setActiveCategory] = useState('all')
+  const [activeTag, setActiveTag] = useState(null)
   const [searchText, setSearchText] = useState('')
+  const [savedIds, setSavedIds] = useState(getSavedPosts())
   const [openPost, setOpenPost] = useState(null)
   const [showNew, setShowNew] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -387,6 +398,7 @@ export default function Community() {
   function refresh() {
     setPosts(getPosts())
     setUser(getUser())
+    setSavedIds(getSavedPosts())
   }
 
   function handleLike(id) {
@@ -394,10 +406,20 @@ export default function Community() {
     refresh()
   }
 
+  function handleSave(postId) {
+    const updated = toggleSavePost(postId)
+    setSavedIds(updated)
+  }
+
+  // Collect all unique tags from posts
+  const allTags = [...new Set(posts.flatMap(p => p.tags || []))].slice(0, 12)
+
   const filtered = posts.filter(p => {
+    if (activeCategory === 'saved') return savedIds.includes(p.id)
     const catOk = activeCategory === 'all' || p.category === activeCategory
+    const tagOk = !activeTag || (p.tags || []).includes(activeTag)
     const txtOk = !searchText || p.title.includes(searchText) || p.content.includes(searchText)
-    return catOk && txtOk
+    return catOk && tagOk && txtOk
   })
 
   return (
@@ -444,11 +466,11 @@ export default function Community() {
         }}
       />
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 16, paddingBottom: 2 }}>
-        {CATEGORIES.map(cat => (
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 10, paddingBottom: 2 }}>
+        {[...CATEGORIES, { id: 'saved', label: '★ 已保存' }].map(cat => (
           <button
             key={cat.id}
-            onClick={() => setActiveCategory(cat.id)}
+            onClick={() => { tap(); setActiveCategory(cat.id); setActiveTag(null) }}
             style={{
               padding: '7px 14px', borderRadius: 999, whiteSpace: 'nowrap',
               border: 'none', cursor: 'pointer', fontSize: 12,
@@ -462,6 +484,20 @@ export default function Community() {
           </button>
         ))}
       </div>
+
+      {/* Tag chips */}
+      {allTags.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 14, paddingBottom: 2 }}>
+          {allTags.map(tag => (
+            <button key={tag} onClick={() => { tap(); setActiveTag(activeTag === tag ? null : tag) }} style={{
+              padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap', border: 'none', cursor: 'pointer',
+              fontSize: 11, background: activeTag === tag ? 'rgba(196,146,74,0.25)' : 'rgba(196,146,74,0.08)',
+              color: activeTag === tag ? '#c4924a' : '#8a7a5e', fontWeight: activeTag === tag ? 600 : 400,
+              transition: 'all 0.2s ease',
+            }}>#{tag}</button>
+          ))}
+        </div>
+      )}
 
       <button
         onClick={() => setShowNew(true)}
@@ -487,7 +523,13 @@ export default function Community() {
         </div>
       ) : (
         filtered.map(post => (
-          <PostCard key={post.id} post={post} onOpen={() => setOpenPost(post)} onLike={handleLike} />
+          <PostCard
+            key={post.id} post={post}
+            onOpen={() => setOpenPost(post)}
+            onLike={handleLike}
+            onSave={handleSave}
+            saved={savedIds.includes(post.id)}
+          />
         ))
       )}
 

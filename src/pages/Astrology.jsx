@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ZODIAC_SIGNS, ZODIAC_EXTENDED, getZodiacByDate } from '../data/zodiacData'
 import {
   STEMS, BRANCHES, STEM_ELEMENTS, BRANCH_ELEMENTS,
   ELEMENT_COLORS, DAY_MASTER_DESC, getBazi, getElementBalance, getDaYun,
 } from '../data/baziData'
+import { getUserBirth, saveUserBirth } from '../utils/storage'
+import { tap } from '../utils/haptics'
 
 const SIGN_ORDER = ['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces']
 const ELCOL = { '火': '#c44a3e', '土': '#5c7a3e', '风': '#c4924a', '水': '#3e6c8c' }
@@ -103,7 +105,21 @@ function ThreePillars({ sunSign, moonSign, risingSign }) {
 
   return (
     <div className="card-soft" style={{ padding: 20, marginBottom: 14, background: 'linear-gradient(135deg, #ffffff, #fefcf6)' }}>
-      <p className="section-sub" style={{ marginBottom: 8 }}>THREE PILLARS · 三巨头</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <p className="section-sub">THREE PILLARS · 三巨头</p>
+        <button
+          onClick={() => {
+            tap()
+            const text = `我的星盘三巨头\n${pillars.map(p => `${p.label}：${p.sign.name} · ${p.sign[p.tagKey]}`).join('\n')}\n\n#月相塔罗 #Lunaria`
+            if (navigator.share) navigator.share({ title: '我的星盘三巨头', text }).catch(() => {})
+            else navigator.clipboard?.writeText(text)
+          }}
+          style={{
+            background: 'rgba(196,146,74,0.1)', border: '1px solid rgba(196,146,74,0.25)',
+            borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontSize: 12, color: '#c4924a',
+          }}
+        >分享↑</button>
+      </div>
       <p className="serif" style={{ fontSize: 16, color: '#2d2618', marginBottom: 10, lineHeight: 1.5 }}>
         {pillars.map(p => `${p.label.split(' ')[0]}${p.sign.name}`).join(' · ')}
       </p>
@@ -650,6 +666,18 @@ export default function Astrology() {
   const [submitted, setSubmitted] = useState(false)
   const [browsing, setBrowsing] = useState(null)
 
+  // Pre-fill from saved birth data
+  useEffect(() => {
+    const birth = getUserBirth()
+    if (birth) {
+      if (birth.month) setMonth(String(birth.month))
+      if (birth.day) setDay(String(birth.day))
+      if (birth.year) setYear(String(birth.year))
+      if (birth.hour !== null && birth.hour !== undefined) setHour(String(birth.hour))
+      setSubmitted(true)
+    }
+  }, [])
+
   const sunSignId = submitted && month && day ? getZodiacByDate(month, day) : null
   const sunSign = sunSignId ? SIGNS.find(s => s.id === sunSignId) : null
 
@@ -671,6 +699,12 @@ export default function Astrology() {
     if (!month || !day) return
     setSubmitted(true)
     setBrowsing(null)
+    saveUserBirth({
+      month: parseInt(month),
+      day: parseInt(day),
+      year: year ? parseInt(year) : null,
+      hour: hour !== '' ? parseInt(hour) : null,
+    })
   }
 
   const TABS = [
@@ -727,7 +761,7 @@ export default function Astrology() {
       {/* Tab Bar */}
       <div style={{ background: '#fdf9f0', borderRadius: 999, padding: 4, display: 'flex', gap: 4, marginBottom: 20 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
+          <button key={t.id} onClick={() => { tap(); setTab(t.id) }} style={{
             flex: 1, padding: '9px 4px', borderRadius: 999, border: 'none', cursor: 'pointer',
             background: tab === t.id ? '#2d4a3e' : 'transparent',
             color: tab === t.id ? '#fdf9f0' : '#5a4a3a',

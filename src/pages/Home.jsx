@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { MAJOR_ARCANA } from '../data/tarotCards'
 import { CardFace, CardBack } from '../components/TarotCardArt'
 import Mascot from '../components/Mascot'
-import { getJournal, getUser, saveReading, relTime } from '../utils/storage'
+import { getJournal, getUser, saveReading, relTime, getUserBirth, recordVisit, getStreak } from '../utils/storage'
+import { ZODIAC_SIGNS, getZodiacByDate } from '../data/zodiacData'
 
 const DAILY_QUOTES = [
   '宇宙正在为你对齐最完美的能量频率',
@@ -334,15 +335,35 @@ function QuickActions({ onNavigate }) {
   )
 }
 
+function getMoonSignIdx(year, month, day) {
+  const ref = new Date(2000, 0, 6)
+  const target = new Date(year, month - 1, day)
+  const days = (target - ref) / 86400000
+  const moonDays = ((days % 29.53059) + 29.53059) % 29.53059
+  const signIndex = Math.floor(moonDays / 2.461)
+  return (9 + signIndex) % 12
+}
+
+const SIGN_ORDER = ['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces']
+
 export default function Home({ onNavigate }) {
   const [user] = useState(getUser())
   const [journal, setJournal] = useState(getJournal())
+  const [streak, setStreak] = useState(0)
 
   useEffect(() => {
+    recordVisit()
+    setStreak(getStreak())
     const refresh = () => setJournal(getJournal())
     window.addEventListener('focus', refresh)
     return () => window.removeEventListener('focus', refresh)
   }, [])
+
+  const birth = getUserBirth()
+  const sunSignId = birth ? getZodiacByDate(birth.month, birth.day) : null
+  const sunSign = sunSignId ? ZODIAC_SIGNS.find(s => s.id === sunSignId) : null
+  const moonSignId = (birth && birth.year) ? SIGN_ORDER[getMoonSignIdx(birth.year, birth.month, birth.day)] : null
+  const moonSign = moonSignId ? ZODIAC_SIGNS.find(s => s.id === moonSignId) : null
 
   function handleSaveDaily(card) {
     saveReading({
@@ -362,20 +383,51 @@ export default function Home({ onNavigate }) {
   return (
     <div className="animate-fade-in" style={{ padding: '40px 18px 0', maxWidth: 520, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingTop: 16 }}>
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, paddingTop: 16 }}>
+        <div style={{ flex: 1 }}>
           <p style={{ fontSize: 11, color: '#8a7a5e', letterSpacing: '0.15em', marginBottom: 4 }}>
             {greeting.toUpperCase()}
           </p>
-          <h1 className="serif" style={{ fontSize: 22, color: '#2d2618' }}>
+          <h1 className="serif" style={{ fontSize: 22, color: '#2d2618', marginBottom: 6 }}>
             {user.name}
           </h1>
+          {sunSign && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{
+                fontSize: 11, color: sunSign.elementColor, background: `${sunSign.elementColor}15`,
+                padding: '3px 10px', borderRadius: 99, fontWeight: 500,
+              }}>
+                ☀ {sunSign.name}
+              </span>
+              {moonSign && (
+                <span style={{
+                  fontSize: 11, color: '#3e6c8c', background: 'rgba(62,108,140,0.1)',
+                  padding: '3px 10px', borderRadius: 99, fontWeight: 500,
+                }}>
+                  ☽ {moonSign.name}
+                </span>
+              )}
+            </div>
+          )}
+          {streak > 0 && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              marginTop: 8, background: 'rgba(196,146,74,0.12)',
+              padding: '4px 10px', borderRadius: 99,
+            }}>
+              <span style={{ fontSize: 12 }}>🔥</span>
+              <span style={{ fontSize: 11, color: '#c4924a', fontWeight: 600 }}>
+                连续第{streak}天
+              </span>
+            </div>
+          )}
         </div>
         <div className="animate-float" style={{
           width: 56, height: 56,
           background: 'rgba(196,146,74,0.1)',
           borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
         }}>
           <Mascot size={42} />
         </div>

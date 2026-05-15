@@ -6,6 +6,10 @@ const KEYS = {
   USER: 'lunaria:user',
   LIKES: 'lunaria:likes',
   COMMENTS: 'lunaria:comments',
+  BIRTH: 'lunaria:birth',
+  SAVED_POSTS: 'lunaria:saved',
+  VISITS: 'lunaria:visits',
+  ONBOARDED: 'lunaria:onboarded',
 }
 
 function safeGet(key, fallback) {
@@ -148,6 +152,45 @@ export function addComment(postId, text) {
   )
   safeSet(KEYS.POSTS, posts)
   return comment
+}
+
+// ── Birth data ────────────────────────────────────
+export function getUserBirth() { return safeGet(KEYS.BIRTH, null) }
+export function saveUserBirth(data) { safeSet(KEYS.BIRTH, data) }
+export function isOnboarded() { return !!localStorage.getItem(KEYS.ONBOARDED) }
+export function setOnboarded() { localStorage.setItem(KEYS.ONBOARDED, '1') }
+
+// ── Saved posts (bookmarks) ───────────────────────
+export function getSavedPosts() { return safeGet(KEYS.SAVED_POSTS, []) }
+export function toggleSavePost(postId) {
+  const saved = safeGet(KEYS.SAVED_POSTS, [])
+  const idx = saved.indexOf(postId)
+  if (idx >= 0) saved.splice(idx, 1)
+  else saved.push(postId)
+  safeSet(KEYS.SAVED_POSTS, saved)
+  return [...saved]
+}
+
+// ── Visit streak ──────────────────────────────────
+export function recordVisit() {
+  const today = new Date().toISOString().slice(0, 10)
+  const visits = safeGet(KEYS.VISITS, [])
+  if (!visits.includes(today)) { visits.push(today); safeSet(KEYS.VISITS, visits) }
+}
+
+export function getStreak() {
+  const visits = safeGet(KEYS.VISITS, [])
+  if (!visits.length) return 0
+  const today = new Date()
+  let streak = 0
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    const s = d.toISOString().slice(0, 10)
+    if (visits.includes(s)) streak++
+    else break
+  }
+  return streak
 }
 
 // ── Time helpers ──────────────────────────────────

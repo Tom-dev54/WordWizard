@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { MAJOR_ARCANA, SPREADS } from '../data/tarotCards'
 import { CardFace, CardBack } from '../components/TarotCardArt'
-import { saveReading } from '../utils/storage'
+import { saveReading, getJournal, deleteReading } from '../utils/storage'
 import Sheet from '../components/Sheet'
+import { impact, tap, success } from '../utils/haptics'
 
 function drawCards(count) {
   const shuffled = [...MAJOR_ARCANA].sort(() => Math.random() - 0.5)
@@ -98,9 +99,30 @@ function CardDetailSheet({ card, reversed, onClose }) {
             </p>
           </div>
 
-          <button onClick={dismiss} className="btn-primary" style={{ width: '100%' }}>
-            收起解读
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={dismiss} className="btn-primary" style={{ flex: 1 }}>
+              收起解读
+            </button>
+            <button
+              onClick={() => {
+                tap()
+                const text = `我今日的塔罗牌是《${card.nameCN}》\n${reversed ? card.reversedMeaning : card.uprightMeaning}\n\n#月相塔罗 #Lunaria`
+                if (navigator.share) {
+                  navigator.share({ title: `塔罗 · ${card.nameCN}`, text }).catch(() => {})
+                } else {
+                  navigator.clipboard?.writeText(text)
+                }
+              }}
+              style={{
+                width: 48, background: 'rgba(196,146,74,0.12)',
+                border: '1px solid rgba(196,146,74,0.3)',
+                borderRadius: 12, cursor: 'pointer', fontSize: 18,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              ↑
+            </button>
+          </div>
         </>
       )}
     </Sheet>
@@ -188,8 +210,136 @@ function SaveJournalSheet({ spread, cards, onClose, onSaved }) {
   )
 }
 
+function HistoryTab() {
+  const [journal, setJournal] = useState(getJournal())
+  const [selected, setSelected] = useState(null)
+
+  function handleDelete(id) {
+    const updated = deleteReading(id)
+    setJournal(updated)
+    setSelected(null)
+    success()
+  }
+
+  if (journal.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 24px' }}>
+        <p style={{ fontSize: 40, marginBottom: 16 }}>📖</p>
+        <p className="serif" style={{ fontSize: 17, color: '#2d2618', marginBottom: 8 }}>还没有记录</p>
+        <p style={{ fontSize: 13, color: '#8a7a5e' }}>每次占卜后保存，这里会记录你的成长轨迹</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="animate-fade-up">
+      {journal.map((entry, idx) => {
+        const firstCard = entry.cards?.[0]
+        const cardData = firstCard ? MAJOR_ARCANA.find(c => c.id === firstCard.cardId) : null
+        return (
+          <button
+            key={entry.id}
+            onClick={() => { tap(); setSelected(entry) }}
+            className="card-soft"
+            style={{
+              width: '100%', padding: 14, marginBottom: 10,
+              display: 'flex', gap: 12, alignItems: 'center',
+              cursor: 'pointer', border: 'none', textAlign: 'left',
+              animation: `fade-up 0.4s ease-out ${idx * 0.05}s both`,
+              transition: 'transform 0.15s ease',
+            }}
+            onTouchStart={e => e.currentTarget.style.transform = 'scale(0.98)'}
+            onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <div style={{ width: 46, height: 72, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+              {cardData ? (
+                <CardFace card={cardData} reversed={firstCard.reversed} />
+              ) : (
+                <div style={{
+                  width: '100%', height: '100%',
+                  background: 'linear-gradient(135deg, #2d4a3e, #1f3329)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#c4924a', fontSize: 18,
+                }}>✦</div>
+              )}
+            </div>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <p className="serif" style={{ fontSize: 14, color: '#2d2618', marginBottom: 3 }}>
+                {entry.spreadName || '占卜记录'}
+              </p>
+              <p style={{ fontSize: 12, color: '#5a4a3a', marginBottom: 3 }}>
+                {entry.cards?.map(c => c.cardName).slice(0, 2).join(' · ')}
+                {entry.cards?.length > 2 ? '…' : ''}
+              </p>
+              <p style={{ fontSize: 10, color: '#8a7a5e' }}>
+                {new Date(entry.createdAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
+                {entry.question ? ` · ${entry.question.slice(0, 12)}…` : ''}
+              </p>
+            </div>
+            <span style={{ color: '#c4924a', fontSize: 16 }}>›</span>
+          </button>
+        )
+      })}
+      {selected && (
+        <Sheet onClose={() => setSelected(null)}>
+          {(dismiss) => (
+            <>
+              <div className="sheet-handle" />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <div>
+                  <h3 className="serif" style={{ fontSize: 20, color: '#2d2618', marginBottom: 4 }}>
+                    {selected.spreadName}
+                  </h3>
+                  <p style={{ fontSize: 11, color: '#8a7a5e' }}>
+                    {new Date(selected.createdAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDelete(selected.id)}
+                  style={{ background: 'none', border: 'none', color: '#8c4a5e', fontSize: 12, cursor: 'pointer', padding: 4 }}
+                >
+                  删除
+                </button>
+              </div>
+              {selected.question && (
+                <div style={{ background: 'rgba(196,146,74,0.08)', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                  <p style={{ fontSize: 11, color: '#8a7a5e', marginBottom: 4 }}>问题</p>
+                  <p style={{ fontSize: 13, color: '#3d3327' }}>{selected.question}</p>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, marginBottom: 14 }}>
+                {selected.cards?.map((c, i) => {
+                  const cardData = MAJOR_ARCANA.find(cd => cd.id === c.cardId)
+                  return (
+                    <div key={i} style={{ flexShrink: 0, width: 70, textAlign: 'center' }}>
+                      <div style={{ width: 70, height: 110, borderRadius: 8, overflow: 'hidden', marginBottom: 4 }}>
+                        {cardData ? <CardFace card={cardData} reversed={c.reversed} /> : null}
+                      </div>
+                      <p style={{ fontSize: 9, color: '#8a7a5e', marginBottom: 2 }}>{c.position}</p>
+                      <p style={{ fontSize: 11, color: '#2d2618' }}>{c.cardName}</p>
+                      {c.reversed && <span style={{ fontSize: 9, color: '#8c4a5e' }}>逆</span>}
+                    </div>
+                  )
+                })}
+              </div>
+              {selected.note && (
+                <div style={{ background: '#fff', borderRadius: 10, padding: 14, marginBottom: 16, border: '1px solid rgba(196,146,74,0.15)' }}>
+                  <p style={{ fontSize: 11, color: '#8a7a5e', marginBottom: 6 }}>笔记</p>
+                  <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.8 }}>{selected.note}</p>
+                </div>
+              )}
+              <button onClick={dismiss} className="btn-primary" style={{ width: '100%' }}>关闭</button>
+            </>
+          )}
+        </Sheet>
+      )}
+    </div>
+  )
+}
+
 export default function Tarot() {
   const [phase, setPhase] = useState('select')
+  const [activeTab, setActiveTab] = useState('draw')
   const [spread, setSpread] = useState(null)
   const [drawn, setDrawn] = useState([])
   const [flipped, setFlipped] = useState([])
@@ -209,7 +359,10 @@ export default function Tarot() {
     setDrawn(cards)
     setPhase('reveal')
     cards.forEach((_, i) => {
-      setTimeout(() => setFlipped(prev => [...prev, i]), i * 350 + 300)
+      setTimeout(() => {
+        setFlipped(prev => [...prev, i])
+        impact()
+      }, i * 350 + 300)
     })
   }
 
@@ -227,12 +380,34 @@ export default function Tarot() {
 
   return (
     <div className="animate-fade-in pb-nav" style={{ padding: '40px 18px 0', maxWidth: 520, margin: '0 auto' }}>
-      <div style={{ paddingTop: 16, marginBottom: 24, textAlign: 'center' }}>
+      <div style={{ paddingTop: 16, marginBottom: 20, textAlign: 'center' }}>
         <p className="section-sub">DIVINATION</p>
-        <h1 className="serif" style={{ fontSize: 26, color: '#2d2618' }}>塔罗占卜</h1>
+        <h1 className="serif" style={{ fontSize: 26, color: '#2d2618', marginBottom: 16 }}>塔罗占卜</h1>
+        <div style={{
+          display: 'inline-flex', background: 'rgba(45,38,24,0.06)',
+          borderRadius: 12, padding: 3, gap: 2,
+        }}>
+          {[['draw','占卜'], ['history','历史记录']].map(([id, label]) => (
+            <button key={id} onClick={() => { tap(); setActiveTab(id); if (id === 'draw') setPhase('select') }}
+              style={{
+                padding: '8px 18px', borderRadius: 10, border: 'none',
+                background: activeTab === id ? '#fff' : 'transparent',
+                color: activeTab === id ? '#2d2618' : '#8a7a5e',
+                fontWeight: activeTab === id ? 600 : 400,
+                fontSize: 13, cursor: 'pointer',
+                boxShadow: activeTab === id ? '0 1px 4px rgba(45,38,24,0.12)' : 'none',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {phase === 'select' && (
+      {activeTab === 'history' && <HistoryTab />}
+
+      {activeTab === 'draw' && phase === 'select' && (
         <div className="animate-fade-up">
           <p style={{ fontSize: 13, color: '#5a4a3a', lineHeight: 1.7, textAlign: 'center', marginBottom: 24 }}>
             深呼吸，让心静下来。<br />
@@ -277,7 +452,7 @@ export default function Tarot() {
         </div>
       )}
 
-      {phase === 'shuffle' && (
+      {activeTab === 'draw' && phase === 'shuffle' && (
         <div className="animate-fade-up" style={{ textAlign: 'center', paddingTop: 24 }}>
           <div className="animate-float" style={{ marginBottom: 24 }}>
             <div style={{ width: 120, height: 180, margin: '0 auto', borderRadius: 10, overflow: 'hidden' }}>
@@ -305,7 +480,7 @@ export default function Tarot() {
         </div>
       )}
 
-      {phase === 'reveal' && drawn.length > 0 && (
+      {activeTab === 'draw' && phase === 'reveal' && drawn.length > 0 && (
         <div className="animate-fade-up">
           <p style={{ textAlign: 'center', fontSize: 12, color: '#8a7a5e', marginBottom: 18 }}>
             ✦ {spread.name} · 点击牌面查看详细解读 ✦
