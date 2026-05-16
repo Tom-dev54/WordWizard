@@ -6,6 +6,7 @@ import { saveReading, getJournal, deleteReading } from '../utils/storage'
 import { isPremium } from '../utils/premium'
 import { getAIReading, buildTarotPrompt } from '../utils/deepseek'
 import Sheet from '../components/Sheet'
+import FullPage from '../components/FullPage'
 import PremiumSheet from '../components/PremiumSheet'
 import { impact, tap, success } from '../utils/haptics'
 
@@ -51,87 +52,84 @@ function TarotCard({ card, reversed, position, flipped, onClick, narrow }) {
 function CardDetailSheet({ card, reversed, onClose }) {
   if (!card) return null
   return (
-    <Sheet onClose={onClose}>
-      {(dismiss) => (
-        <>
-          <div className="sheet-handle" />
-          <div style={{ display: 'flex', gap: 18, marginBottom: 20 }}>
-            <div style={{ width: 90, height: 140, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}>
-              <CardFace card={card} reversed={reversed} />
-            </div>
-            <div style={{ paddingTop: 6 }}>
-              <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.2em', marginBottom: 6 }}>
-                {card.number}
-              </p>
-              <h2 className="serif" style={{ fontSize: 24, color: '#2d2618', marginBottom: 2 }}>
-                {card.nameCN}
-              </h2>
-              <p style={{ fontSize: 12, color: '#8a7a5e', fontStyle: 'italic', marginBottom: 12 }}>
-                {card.name}
-              </p>
-              {reversed && (
-                <span className="pill pill-wine">逆位 · Reversed</span>
-              )}
-              <div style={{ display: 'flex', gap: 8, marginTop: 12, fontSize: 11, color: '#5a4a3a' }}>
-                <span>🜂 {card.element}</span>
-                <span style={{ color: '#c4924a' }}>·</span>
-                <span>🪐 {card.planet}</span>
-              </div>
+    <FullPage onClose={onClose}>
+      <div style={{ padding: '0 20px 20px' }}>
+        <div style={{ display: 'flex', gap: 18, marginBottom: 20 }}>
+          <div style={{ width: 90, height: 140, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}>
+            <CardFace card={card} reversed={reversed} />
+          </div>
+          <div style={{ paddingTop: 6 }}>
+            <p style={{ fontSize: 10, color: '#8a7a5e', letterSpacing: '0.2em', marginBottom: 6 }}>
+              {card.number}
+            </p>
+            <h2 className="serif" style={{ fontSize: 24, color: '#2d2618', marginBottom: 2 }}>
+              {card.nameCN}
+            </h2>
+            <p style={{ fontSize: 12, color: '#8a7a5e', fontStyle: 'italic', marginBottom: 12 }}>
+              {card.name}
+            </p>
+            {reversed && (
+              <span className="pill pill-wine">逆位 · Reversed</span>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, fontSize: 11, color: '#5a4a3a' }}>
+              <span>🜂 {card.element}</span>
+              <span style={{ color: '#c4924a' }}>·</span>
+              <span>🪐 {card.planet}</span>
             </div>
           </div>
+        </div>
 
-          <div style={{ marginBottom: 18 }}>
-            <p className="section-sub" style={{ marginBottom: 8 }}>关键词</p>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {card.keywords.map(k => (
-                <span key={k} className="pill pill-forest">{k}</span>
-              ))}
-            </div>
+        <div style={{ marginBottom: 18 }}>
+          <p className="section-sub" style={{ marginBottom: 8 }}>关键词</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {card.keywords.map(k => (
+              <span key={k} className="pill pill-forest">{k}</span>
+            ))}
           </div>
+        </div>
 
-          <div style={{
-            background: reversed ? 'rgba(140,74,94,0.06)' : 'rgba(45,74,62,0.06)',
-            borderRadius: 14, padding: 16, marginBottom: 14,
-            borderLeft: `3px solid ${reversed ? '#8c4a5e' : '#2d4a3e'}`,
+        <div style={{
+          background: reversed ? 'rgba(140,74,94,0.06)' : 'rgba(45,74,62,0.06)',
+          borderRadius: 14, padding: 16, marginBottom: 14,
+          borderLeft: `3px solid ${reversed ? '#8c4a5e' : '#2d4a3e'}`,
+        }}>
+          <p style={{
+            fontSize: 11, color: reversed ? '#6e3848' : '#2d4a3e',
+            letterSpacing: '0.15em', marginBottom: 10, fontWeight: 600,
           }}>
-            <p style={{
-              fontSize: 11, color: reversed ? '#6e3848' : '#2d4a3e',
-              letterSpacing: '0.15em', marginBottom: 10, fontWeight: 600,
-            }}>
-              {reversed ? '▽ 逆位解读' : '△ 正位解读'}
-            </p>
-            <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.8 }}>
-              {reversed ? card.reversedMeaning : card.uprightMeaning}
-            </p>
-          </div>
+            {reversed ? '▽ 逆位解读' : '△ 正位解读'}
+          </p>
+          <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.8 }}>
+            {reversed ? card.reversedMeaning : card.uprightMeaning}
+          </p>
+        </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={dismiss} className="btn-primary" style={{ flex: 1 }}>
-              收起解读
-            </button>
-            <button
-              onClick={() => {
-                tap()
-                const text = `我今日的塔罗牌是《${card.nameCN}》\n${reversed ? card.reversedMeaning : card.uprightMeaning}\n\n#月相塔罗 #Lunaria`
-                if (navigator.share) {
-                  navigator.share({ title: `塔罗 · ${card.nameCN}`, text }).catch(() => {})
-                } else {
-                  navigator.clipboard?.writeText(text)
-                }
-              }}
-              style={{
-                width: 48, background: 'rgba(196,146,74,0.12)',
-                border: '1px solid rgba(196,146,74,0.3)',
-                borderRadius: 12, cursor: 'pointer', fontSize: 18,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              ↑
-            </button>
-          </div>
-        </>
-      )}
-    </Sheet>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} className="btn-primary" style={{ flex: 1 }}>
+            收起解读
+          </button>
+          <button
+            onClick={() => {
+              tap()
+              const text = `我今日的塔罗牌是《${card.nameCN}》\n${reversed ? card.reversedMeaning : card.uprightMeaning}\n\n#月相塔罗 #Lunaria`
+              if (navigator.share) {
+                navigator.share({ title: `塔罗 · ${card.nameCN}`, text }).catch(() => {})
+              } else {
+                navigator.clipboard?.writeText(text)
+              }
+            }}
+            style={{
+              width: 48, background: 'rgba(196,146,74,0.12)',
+              border: '1px solid rgba(196,146,74,0.3)',
+              borderRadius: 12, cursor: 'pointer', fontSize: 18,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            ↑
+          </button>
+        </div>
+      </div>
+    </FullPage>
   )
 }
 

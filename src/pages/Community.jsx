@@ -442,7 +442,8 @@ function SettingsSheet({ onClose }) {
 
 export default function Community() {
   const [posts, setPosts] = useState(getPosts())
-  const [activeCategory, setActiveCategory] = useState('all')
+  const [activeCategory, setActiveCategory] = useState('')
+  useEffect(() => { setActiveCategory('all') }, [])
   const [activeTag, setActiveTag] = useState(null)
   const [searchText, setSearchText] = useState('')
   const [savedIds, setSavedIds] = useState(getSavedPosts())
@@ -522,7 +523,7 @@ export default function Community() {
         }}
       />
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 10, paddingBottom: 2 }}>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', marginBottom: 10, paddingBottom: 2 }}>
         {[...CATEGORIES, { id: 'saved', label: '★ 已保存' }].map(cat => (
           <button
             key={cat.id}
