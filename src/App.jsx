@@ -16,22 +16,12 @@ const PAGES = {
   community: Community,
 }
 
-function shouldShowSplash() {
-  const today = new Date().toISOString().slice(0, 10)
-  return localStorage.getItem('lunaria:splash_' + today) !== '1'
-}
-
 export default function App() {
   const [page, setPage] = useState('home')
   const [showOnboarding, setShowOnboarding] = useState(!isOnboarded())
-  const [showSplash, setShowSplash] = useState(() => !showOnboarding && shouldShowSplash())
+  // Always show splash on every launch (unless onboarding is still in progress)
+  const [showSplash, setShowSplash] = useState(!showOnboarding)
   const Page = PAGES[page] || Home
-
-  function handleSplashDone() {
-    const today = new Date().toISOString().slice(0, 10)
-    localStorage.setItem('lunaria:splash_' + today, '1')
-    setShowSplash(false)
-  }
 
   return (
     <div className="paper-bg" style={{ minHeight: '100vh', position: 'relative' }}>
@@ -40,8 +30,15 @@ export default function App() {
         <Page onNavigate={setPage} />
       </div>
       <Navigation current={page} onNavigate={setPage} />
-      {showOnboarding && <Onboarding onDone={() => { setShowOnboarding(false); setShowSplash(false) }} />}
-      {showSplash && !showOnboarding && <DailySplash onDone={handleSplashDone} />}
+      {showOnboarding && (
+        <Onboarding onDone={() => {
+          setShowOnboarding(false)
+          setShowSplash(true)
+        }} />
+      )}
+      {showSplash && !showOnboarding && (
+        <DailySplash onDone={() => setShowSplash(false)} />
+      )}
     </div>
   )
 }

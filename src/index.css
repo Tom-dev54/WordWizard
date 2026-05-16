@@ -250,3 +250,50 @@ input:focus, textarea:focus {
 
 /* No iOS zoom on input focus */
 input, textarea, select { font-size: 16px; }
+
+/* ── New additions ── */
+
+/* Meteor / shooting star */
+@keyframes meteor {
+  0% { transform: translate(0, 0) rotate(-42deg); opacity: 0; }
+  8% { opacity: 1; }
+  85% { opacity: 0.6; }
+  100% { transform: translate(260px, 260px) rotate(-42deg); opacity: 0; }
+}
+
+/* Card golden glow pulse */
+@keyframes card-glow {
+  0%, 100% { box-shadow: 0 8px 32px rgba(196,146,74,0.18), 0 2px 8px rgba(45,74,62,0.15); }
+  50% { box-shadow: 0 8px 48px rgba(196,146,74,0.5), 0 2px 12px rgba(45,74,62,0.2); }
+}
+.animate-card-glow { animation: card-glow 3s ease-in-out infinite; }
+
+/* Nebula pulse for splash */
+@keyframes nebula {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 0.75; transform: scale(1.1); }
+}
+
+/* Context tab styles */
+.ctx-tab {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 13px; white-space: nowrap;
+  background: none; border: none; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.ctx-tab.active { border-bottom-color: #c4924a; }
+.ctx-tab .ctx-lbl { font-size: 11px; color: #8a7a5e; transition: color 0.2s; }
+.ctx-tab.active .ctx-lbl { color: #c4924a; font-weight: 600; }
+
+/* Mood tag */
+.mood-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 500;
+  background: rgba(140,74,94,0.08); color: #6e3848;
+  border: 1px solid rgba(140,74,94,0.15);
+}
+
+/* Journal entry glow on hover */
+.journal-entry:active { transform: scale(0.985); }
