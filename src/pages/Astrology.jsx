@@ -13,11 +13,9 @@ import { tap } from '../utils/haptics'
 
 const SIGN_ORDER = ['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces']
 const ELCOL = { '火': '#c44a3e', '土': '#5c7a3e', '风': '#c4924a', '水': '#3e6c8c' }
-
-// Enrich zodiac signs with extended data
 const SIGNS = ZODIAC_SIGNS.map(s => ({ ...s, ...ZODIAC_EXTENDED[s.id] }))
 
-// ── Utility helpers ─────────────────────────────────────────────────────
+// ── Utility helpers ──────────────────────────────────────────────────────────
 
 function getMoonSignIdx(year, month, day) {
   const ref = new Date(2000, 0, 6)
@@ -39,66 +37,217 @@ function dailyScore(signId, area, date) {
   return Math.min(99, Math.max(55, base + seed - 20))
 }
 
-// ── Zodiac Wheel ─────────────────────────────────────────────────────────
+// ── Planet / NatalChart data ─────────────────────────────────────────────────
 
-function ZodiacWheel({ highlightId }) {
-  const size = 260, cx = 130, cy = 130, outerR = 120, innerR = 80, labelR = 100
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
-      style={{ display: 'block', margin: '0 auto', filter: 'drop-shadow(0 4px 16px rgba(196,146,74,0.18))' }}
-    >
-      <defs>
-        <radialGradient id="wCenter" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#fdf9f0" />
-          <stop offset="100%" stopColor="#f5ecd9" />
-        </radialGradient>
-      </defs>
-      <circle cx={cx} cy={cy} r={outerR + 3} fill="none" stroke="#c4924a" strokeWidth="1" opacity="0.4" />
-      {ZODIAC_SIGNS.map((sign, i) => {
-        const sa = (i * 30 - 90) * (Math.PI / 180)
-        const ea = ((i + 1) * 30 - 90) * (Math.PI / 180)
-        const isHi = sign.id === highlightId
-        const x1 = cx + outerR * Math.cos(sa), y1 = cy + outerR * Math.sin(sa)
-        const x2 = cx + outerR * Math.cos(ea), y2 = cy + outerR * Math.sin(ea)
-        const x3 = cx + innerR * Math.cos(ea), y3 = cy + innerR * Math.sin(ea)
-        const x4 = cx + innerR * Math.cos(sa), y4 = cy + innerR * Math.sin(sa)
-        const mid = (sa + ea) / 2
-        const color = ELCOL[sign.element]
-        return (
-          <g key={sign.id}>
-            <path d={`M ${x1} ${y1} A ${outerR} ${outerR} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${innerR} ${innerR} 0 0 0 ${x4} ${y4} Z`}
-              fill={isHi ? color : '#faf4e8'} stroke={isHi ? color : '#e6d4b0'} strokeWidth={isHi ? 1.5 : 0.5}
-              style={{ transition: 'all 0.4s ease' }} opacity={isHi ? 0.9 : 1} />
-            <text x={cx + labelR * Math.cos(mid)} y={cy + labelR * Math.sin(mid) + 2}
-              textAnchor="middle" dominantBaseline="middle" fontSize={isHi ? 15 : 12}
-              fill={isHi ? '#fdf9f0' : color} style={{ transition: 'all 0.4s ease' }}>{sign.symbol}</text>
-          </g>
-        )
-      })}
-      <circle cx={cx} cy={cy} r={innerR} fill="url(#wCenter)" stroke="#c4924a" strokeWidth="1" opacity="0.9" />
-      {ZODIAC_SIGNS.map((_, i) => {
-        const angle = (i * 30 - 90) * (Math.PI / 180)
-        return <line key={i} x1={cx + innerR * Math.cos(angle)} y1={cy + innerR * Math.sin(angle)}
-          x2={cx + outerR * Math.cos(angle)} y2={cy + outerR * Math.sin(angle)}
-          stroke="#c4924a" strokeWidth="0.4" opacity="0.5" />
-      })}
-      {highlightId ? (() => {
-        const s = ZODIAC_SIGNS.find(z => z.id === highlightId)
-        const c = ELCOL[s.element]
-        return (
-          <>
-            <text x={cx} y={cy - 12} textAnchor="middle" fontSize="28" fill={c}>{s.symbol}</text>
-            <text x={cx} y={cy + 14} textAnchor="middle" fontSize="12" fill="#2d2618" fontFamily="Playfair Display, serif" fontWeight="600">{s.name}</text>
-          </>
-        )
-      })() : (
-        <text x={cx} y={cy + 4} textAnchor="middle" fontSize="10" fill="#8a7a5e" letterSpacing="2">ZODIAC</text>
-      )}
-    </svg>
+const PLANETS = ['sun','moon','mercury','venus','mars','jupiter','saturn','uranus','neptune']
+const PLANET_CN  = { sun:'日', moon:'月', mercury:'水', venus:'金', mars:'火', jupiter:'木', saturn:'土', uranus:'天', neptune:'海' }
+const PLANET_SYM = { sun:'☉', moon:'☽', mercury:'☿', venus:'♀', mars:'♂', jupiter:'♃', saturn:'♄', uranus:'⛢', neptune:'♆' }
+const PLANET_COLORS = {
+  sun:'#f5c842', moon:'#c8d8e8', mercury:'#b0b0b0',
+  venus:'#e8a040', mars:'#e04040', jupiter:'#9060c0',
+  saturn:'#6080a0', uranus:'#40b8a0', neptune:'#4060d0',
+}
+const PLANET_PERIODS = { sun:365.25, moon:29.53, mercury:87.97, venus:224.7, mars:686.97, jupiter:4332.6, saturn:10759.2, uranus:30688.5, neptune:60182.0 }
+const PLANET_REF    = { sun:280.46, moon:218.31, mercury:252.25, venus:181.97, mars:355.43, jupiter:34.35, saturn:50.08, uranus:314.05, neptune:304.35 }
+const SIGN_SHORT = ['羊','牛','双','蟹','狮','处','秤','蝎','射','摩','瓶','鱼']
+
+const ASPECT_DEFS = [
+  { key:'conjunction', label:'合相', exact:0,   orb:8,  color:'#f0d040', op:0.75 },
+  { key:'sextile',     label:'六合', exact:60,  orb:6,  color:'#40c060', op:0.65 },
+  { key:'square',      label:'刑',   exact:90,  orb:7,  color:'#e04040', op:0.65 },
+  { key:'trine',       label:'三合', exact:120, orb:8,  color:'#4080e0', op:0.70 },
+  { key:'opposition',  label:'对冲', exact:180, orb:10, color:'#e040a0', op:0.60 },
+]
+
+function getPlanetDegrees(year, month, day) {
+  const days = (new Date(year, month - 1, day) - new Date(2000, 0, 1)) / 86400000
+  return Object.fromEntries(
+    PLANETS.map(p => [p, ((PLANET_REF[p] + (days / PLANET_PERIODS[p]) * 360) % 360 + 360) % 360])
   )
 }
 
-// ── Three Pillars Banner ─────────────────────────────────────────────────
+function getAspects(degs) {
+  const aspects = []
+  for (let i = 0; i < PLANETS.length; i++) {
+    for (let j = i + 1; j < PLANETS.length; j++) {
+      let diff = Math.abs(degs[PLANETS[i]] - degs[PLANETS[j]])
+      if (diff > 180) diff = 360 - diff
+      for (const asp of ASPECT_DEFS) {
+        if (Math.abs(diff - asp.exact) <= asp.orb) {
+          aspects.push({ p1: PLANETS[i], p2: PLANETS[j], ...asp })
+          break
+        }
+      }
+    }
+  }
+  return aspects
+}
+
+// ── 紫微斗数 data ────────────────────────────────────────────────────────────
+
+const PALACE_NAMES = ['命宫','兄弟','夫妻','子女','财帛','疾厄','迁移','交友','官禄','田宅','福德','父母']
+const ZW_BRANCHES  = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥']
+
+const ZW_GRID = [
+  { r:1, c:1, b:5 }, { r:1, c:2, b:6 }, { r:1, c:3, b:7 }, { r:1, c:4, b:8 },
+  { r:2, c:1, b:4 },                                         { r:2, c:4, b:9 },
+  { r:3, c:1, b:3 },                                         { r:3, c:4, b:10 },
+  { r:4, c:1, b:2 }, { r:4, c:2, b:1 }, { r:4, c:3, b:0 }, { r:4, c:4, b:11 },
+]
+
+const MAIN_STARS = ['紫微','天机','太阳','武曲','天同','廉贞','天府','太阴','贪狼','巨门','天相','天梁','七杀','破军']
+const STAR_COLORS = {
+  '紫微':'#d090e0','天机':'#70c870','太阳':'#f0c040','武曲':'#8080e0','天同':'#60d0a0',
+  '廉贞':'#e06060','天府':'#d09040','太阴':'#90c0e0','贪狼':'#e09040','巨门':'#9090c0',
+  '天相':'#60c0c0','天梁':'#a0d060','七杀':'#e05050','破军':'#b050b0',
+}
+
+function getZiWeiData(year, month, day) {
+  const mingGongIdx = (2 + (month - 1)) % 12
+  const seed = ((year * 366 + month * 31 + day) >>> 0)
+  const starPlacement = {}
+  MAIN_STARS.forEach((star, i) => {
+    const idx = (seed * (i * 7 + 11) + i * 13) % 12
+    if (!starPlacement[idx]) starPlacement[idx] = []
+    starPlacement[idx].push(star)
+  })
+  return { mingGongIdx, starPlacement }
+}
+
+// ── NatalChart SVG ────────────────────────────────────────────────────────────
+
+function NatalChart({ year, month, day, isToday }) {
+  const yr = parseInt(year)  || new Date().getFullYear()
+  const mo = parseInt(month) || (new Date().getMonth() + 1)
+  const dy = parseInt(day)   || new Date().getDate()
+
+  const S = 320, cx = 160, cy = 160
+  const signOuter = 155, signInner = 130, planetR = 104, labelR = 88, coreR = 44
+
+  const degs    = getPlanetDegrees(yr, mo, dy)
+  const aspects = getAspects(degs)
+
+  const toXY = (deg, R) => {
+    const a = (deg - 90) * Math.PI / 180
+    return [cx + R * Math.cos(a), cy + R * Math.sin(a)]
+  }
+
+  const SIGN_BG = { '火':'#180a0a', '土':'#0a1508', '风':'#14110a', '水':'#080c18' }
+
+  return (
+    <div style={{ margin: '0 auto', maxWidth: 320 }}>
+      <svg width="100%" viewBox={`0 0 ${S} ${S}`}
+        style={{ display: 'block', filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.55))' }}>
+        <circle cx={cx} cy={cy} r={signOuter + 1} fill="#0a1510" />
+
+        {ZODIAC_SIGNS.map((sign, i) => {
+          const [x1, y1] = toXY(i * 30, signOuter)
+          const [x2, y2] = toXY((i + 1) * 30, signOuter)
+          const [x3, y3] = toXY((i + 1) * 30, signInner)
+          const [x4, y4] = toXY(i * 30, signInner)
+          const [lx, ly] = toXY(i * 30 + 15, (signOuter + signInner) / 2)
+          return (
+            <g key={sign.id}>
+              <path
+                d={`M ${x1} ${y1} A ${signOuter} ${signOuter} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${signInner} ${signInner} 0 0 0 ${x4} ${y4} Z`}
+                fill={SIGN_BG[sign.element] || '#0d160d'} stroke="#1e3828" strokeWidth="0.6" />
+              <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
+                fontSize="9.5" fill="#5a8868" fontFamily="serif">
+                {SIGN_SHORT[i]}
+              </text>
+            </g>
+          )
+        })}
+
+        <circle cx={cx} cy={cy} r={signInner} fill="#0d1a12" />
+
+        {Array.from({ length: 12 }, (_, i) => {
+          const [x1, y1] = toXY(i * 30, coreR)
+          const [x2, y2] = toXY(i * 30, signInner)
+          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#152815" strokeWidth="0.5" />
+        })}
+
+        {aspects.map((asp, i) => {
+          const [x1, y1] = toXY(degs[asp.p1], planetR)
+          const [x2, y2] = toXY(degs[asp.p2], planetR)
+          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+            stroke={asp.color} strokeWidth="0.75" opacity={asp.op} />
+        })}
+
+        {PLANETS.map(p => {
+          const [px, py] = toXY(degs[p], planetR)
+          const [lx, ly] = toXY(degs[p], labelR)
+          const col = PLANET_COLORS[p]
+          return (
+            <g key={p}>
+              <circle cx={px} cy={py} r={4.5} fill={col} opacity={0.9} />
+              <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
+                fontSize="7.5" fill={col} fontWeight="bold">
+                {PLANET_CN[p]}
+              </text>
+            </g>
+          )
+        })}
+
+        <circle cx={cx} cy={cy} r={coreR} fill="#08120a" stroke="#1e3828" strokeWidth="1" />
+        <text x={cx} y={cy - 7} textAnchor="middle" fontSize="8.5" fill="#5a9870"
+          fontFamily="Playfair Display, serif">
+          {isToday ? '天象' : '本命'}
+        </text>
+        <text x={cx} y={cy + 7} textAnchor="middle" fontSize="7" fill="#3a5840">
+          {yr}.{String(mo).padStart(2, '0')}.{String(dy).padStart(2, '0')}
+        </text>
+      </svg>
+
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+        {ASPECT_DEFS.map(a => (
+          <div key={a.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: 14, height: 2, background: a.color, borderRadius: 1, opacity: 0.85 }} />
+            <span style={{ fontSize: 9, color: '#8a7a5e' }}>{a.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Planet Table ─────────────────────────────────────────────────────────────
+
+function PlanetTable({ year, month, day }) {
+  const yr = parseInt(year)  || new Date().getFullYear()
+  const mo = parseInt(month) || 6
+  const dy = parseInt(day)   || 15
+  const degs = getPlanetDegrees(yr, mo, dy)
+  return (
+    <div className="card-soft" style={{ padding: 16, marginBottom: 14 }}>
+      <p className="section-sub" style={{ marginBottom: 12 }}>行星位置</p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {PLANETS.map(p => {
+          const signIdx = Math.floor((degs[p] % 360) / 30)
+          const sign = ZODIAC_SIGNS[signIdx]
+          const deg = Math.floor(degs[p] % 30)
+          return (
+            <div key={p} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '6px 10px', background: '#fdf9f0', borderRadius: 8,
+            }}>
+              <span style={{ fontSize: 14, color: PLANET_COLORS[p], minWidth: 18, textAlign: 'center' }}>
+                {PLANET_SYM[p]}
+              </span>
+              <span style={{ fontSize: 11, color: '#5a4a3a', minWidth: 16 }}>{PLANET_CN[p]}</span>
+              <span style={{ fontSize: 11, color: ELCOL[sign?.element], fontWeight: 500 }}>
+                {sign?.name}
+              </span>
+              <span style={{ fontSize: 9, color: '#8a7a5e', marginLeft: 'auto' }}>{deg}°</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Three Pillars Banner ─────────────────────────────────────────────────────
 
 function ThreePillars({ sunSign, moonSign, risingSign }) {
   const pillars = [
@@ -155,7 +304,7 @@ function ThreePillars({ sunSign, moonSign, risingSign }) {
   )
 }
 
-// ── Fortune Chart ─────────────────────────────────────────────────────────
+// ── Fortune Chart ─────────────────────────────────────────────────────────────
 
 function FortuneChart({ sunSign, moonSign, risingSign }) {
   const areas = [
@@ -164,18 +313,13 @@ function FortuneChart({ sunSign, moonSign, risingSign }) {
     { key: 'wealth', label: '财富运', icon: '◈', color: '#c4924a' },
     { key: 'social', label: '人际运', icon: '◎', color: '#3e6c8c' },
   ]
-
   function getScore(key) {
     const signs = [sunSign, moonSign, risingSign].filter(Boolean)
     const weights = [2, 1, 1]
     let total = 0, wSum = 0
-    signs.forEach((s, i) => {
-      total += s.fortuneScores[key] * weights[i]
-      wSum += weights[i]
-    })
+    signs.forEach((s, i) => { total += s.fortuneScores[key] * weights[i]; wSum += weights[i] })
     return Math.round(total / wSum)
   }
-
   return (
     <div className="card-soft" style={{ padding: 18, marginBottom: 14 }}>
       <p className="section-sub" style={{ marginBottom: 14 }}>FORTUNE ANALYSIS · 运势分析</p>
@@ -188,11 +332,7 @@ function FortuneChart({ sunSign, moonSign, risingSign }) {
               <span style={{ fontSize: 13, color: area.color, fontWeight: 700 }}>{score}</span>
             </div>
             <div style={{ height: 7, background: '#f0e8d6', borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', width: `${score}%`,
-                background: `linear-gradient(90deg, ${area.color}80, ${area.color})`,
-                borderRadius: 4,
-              }} />
+              <div style={{ height: '100%', width: `${score}%`, background: `linear-gradient(90deg, ${area.color}80, ${area.color})`, borderRadius: 4 }} />
             </div>
           </div>
         )
@@ -201,23 +341,15 @@ function FortuneChart({ sunSign, moonSign, risingSign }) {
   )
 }
 
-// ── Sign Detail ──────────────────────────────────────────────────────────
+// ── Sign Detail ──────────────────────────────────────────────────────────────
 
 function SignDetailPanel({ sign }) {
   const color = ELCOL[sign.element]
   return (
     <div className="animate-fade-up">
-      <div className="card-soft" style={{
-        padding: 18, marginBottom: 12,
-        background: `linear-gradient(135deg, ${color}08, #fefcf6)`,
-        borderLeft: `4px solid ${color}`,
-      }}>
+      <div className="card-soft" style={{ padding: 18, marginBottom: 12, background: `linear-gradient(135deg, ${color}08, #fefcf6)`, borderLeft: `4px solid ${color}` }}>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 12 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: '50%', background: color,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28, color: '#fdf9f0', boxShadow: `0 6px 16px ${color}40`, flexShrink: 0,
-          }}>{sign.symbol}</div>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: '#fdf9f0', boxShadow: `0 6px 16px ${color}40`, flexShrink: 0 }}>{sign.symbol}</div>
           <div>
             <h3 className="serif" style={{ fontSize: 20, color: '#2d2618', marginBottom: 2 }}>{sign.name}</h3>
             <p style={{ fontSize: 11, color: '#8a7a5e', fontStyle: 'italic' }}>{sign.en}</p>
@@ -233,21 +365,16 @@ function SignDetailPanel({ sign }) {
           ))}
         </div>
       </div>
-
       <div className="card-soft" style={{ padding: 14, marginBottom: 12 }}>
         <p className="section-sub" style={{ marginBottom: 8 }}>性格特质</p>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {sign.traits.map(t => (
-            <span key={t} className="pill" style={{ background: `${color}12`, color }}>{t}</span>
-          ))}
+          {sign.traits.map(t => <span key={t} className="pill" style={{ background: `${color}12`, color }}>{t}</span>)}
         </div>
       </div>
-
       <div className="card-soft" style={{ padding: 16, marginBottom: 12 }}>
         <p className="section-sub" style={{ marginBottom: 8 }}>星座解析</p>
         <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9 }}>{sign.description}</p>
       </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
         <div className="card-soft" style={{ padding: 14 }}>
           <p style={{ fontSize: 12, color: '#c4924a', marginBottom: 5, fontWeight: 600 }}>♡ 爱情运势</p>
@@ -258,12 +385,10 @@ function SignDetailPanel({ sign }) {
           <p style={{ fontSize: 11, color: '#5a4a3a', lineHeight: 1.7 }}>{sign.career}</p>
         </div>
       </div>
-
       <div className="card-soft" style={{ padding: 14, marginBottom: 12 }}>
         <p className="section-sub" style={{ marginBottom: 10 }}>幸运元素</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-          {[{ l: '数字', v: sign.lucky.number }, { l: '颜色', v: sign.lucky.color },
-            { l: '宝石', v: sign.lucky.stone }, { l: '幸运日', v: sign.lucky.day }].map(item => (
+          {[{ l: '数字', v: sign.lucky.number }, { l: '颜色', v: sign.lucky.color }, { l: '宝石', v: sign.lucky.stone }, { l: '幸运日', v: sign.lucky.day }].map(item => (
             <div key={item.l} style={{ textAlign: 'center', background: '#fdf9f0', padding: '10px 4px', borderRadius: 10 }}>
               <p className="serif" style={{ fontSize: 14, color: '#c4924a', marginBottom: 2 }}>{item.v}</p>
               <p style={{ fontSize: 9, color: '#8a7a5e' }}>{item.l}</p>
@@ -271,97 +396,11 @@ function SignDetailPanel({ sign }) {
           ))}
         </div>
       </div>
-
-      <div className="card-soft" style={{ padding: 14, marginBottom: 12 }}>
-        <p className="section-sub" style={{ marginBottom: 10 }}>最佳配对</p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {sign.compatibility.map(comp => {
-            const s = ZODIAC_SIGNS.find(z => z.name === comp)
-            const c = ELCOL[s?.element]
-            return (
-              <div key={comp} style={{
-                flex: 1, textAlign: 'center', padding: '12px 6px',
-                background: `${c}10`, borderRadius: 12, border: `1px solid ${c}30`,
-              }}>
-                <p style={{ fontSize: 24, marginBottom: 4, color: c }}>{s?.symbol}</p>
-                <p style={{ fontSize: 11, color: '#2d2618', fontWeight: 500 }}>{comp}</p>
-              </div>
-            )
-          })}
-        </div>
-      </div>
     </div>
   )
 }
 
-// ── Tab: 星座分析 ───────────────────────────────────────────────────────
-
-function ZodiacTab({ sunSign, moonSign, risingSign, browsing, setBrowsing }) {
-  const display = sunSign || browsing
-  return (
-    <div>
-      {sunSign && (
-        <>
-          <ThreePillars sunSign={sunSign} moonSign={moonSign} risingSign={risingSign} />
-          <FortuneChart sunSign={sunSign} moonSign={moonSign} risingSign={risingSign} />
-        </>
-      )}
-
-      <div style={{ marginBottom: 16 }}>
-        <ZodiacWheel highlightId={display?.id} />
-      </div>
-
-      {!sunSign && (
-        <>
-          <div className="divider" style={{ margin: '0 0 14px' }}>— 或点击浏览星座 —</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-            {ZODIAC_SIGNS.map(sign => {
-              const color = ELCOL[sign.element]
-              const isActive = browsing?.id === sign.id
-              return (
-                <button key={sign.id} onClick={() => setBrowsing(isActive ? null : sign)}
-                  className="card-soft"
-                  style={{ padding: '12px 6px', cursor: 'pointer', textAlign: 'center', border: 'none',
-                    background: isActive ? color : '#ffffff', transition: 'all 0.2s ease' }}
-                >
-                  <p style={{ fontSize: 22, marginBottom: 3, color: isActive ? '#fff' : color }}>{sign.symbol}</p>
-                  <p style={{ fontSize: 10, color: isActive ? '#fdf9f0' : '#2d2618', fontWeight: 500 }}>{sign.name}</p>
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
-
-      {display && <SignDetailPanel sign={display} />}
-
-      {sunSign && (
-        <>
-          <div className="divider" style={{ margin: '16px 0' }}>— 浏览其他星座 —</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-            {ZODIAC_SIGNS.filter(s => s.id !== sunSign.id).map(sign => {
-              const color = ELCOL[sign.element]
-              const isActive = browsing?.id === sign.id
-              return (
-                <button key={sign.id} onClick={() => setBrowsing(isActive ? null : sign)}
-                  className="card-soft"
-                  style={{ padding: '12px 6px', cursor: 'pointer', textAlign: 'center', border: 'none',
-                    background: isActive ? color : '#ffffff', transition: 'all 0.2s ease' }}
-                >
-                  <p style={{ fontSize: 22, marginBottom: 3, color: isActive ? '#fff' : color }}>{sign.symbol}</p>
-                  <p style={{ fontSize: 10, color: isActive ? '#fdf9f0' : '#2d2618', fontWeight: 500 }}>{sign.name}</p>
-                </button>
-              )
-            })}
-          </div>
-          {browsing && <SignDetailPanel sign={browsing} />}
-        </>
-      )}
-    </div>
-  )
-}
-
-// ── Tab: 今日运势 ───────────────────────────────────────────────────────
+// ── Today fortune data ────────────────────────────────────────────────────────
 
 const MOON_PHASES = [
   { icon: '🌑', name: '新月', hint: '播种新的意图' },
@@ -389,6 +428,8 @@ const SIGN_DAILY_MSGS = {
   pisces: ['直觉是今日最可靠的指南针，先感受，再思考。', '艺术或自然能帮你恢复能量，给自己留一段独处时光。'],
 }
 
+// ── Tab: 天象（FortuneTab）────────────────────────────────────────────────────
+
 function FortuneTab({ sunSign, moonSign, risingSign, premium, onUpgrade }) {
   const [aiGuide, setAiGuide] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
@@ -398,20 +439,10 @@ function FortuneTab({ sunSign, moonSign, risingSign, premium, onUpgrade }) {
     setAiLoading(true)
     try {
       const today = new Date()
-      const scores = {
-        love: dailyScore(sunSign.id, 'love', today),
-        career: dailyScore(sunSign.id, 'career', today),
-        wealth: dailyScore(sunSign.id, 'wealth', today),
-        social: dailyScore(sunSign.id, 'social', today),
-      }
-      const prompt = buildAstrologyPrompt({
-        sunSign: sunSign.name, moonSign: moonSign?.name, risingSign: risingSign?.name, scores,
-      })
-      const result = await getAIReading(prompt)
+      const scores = { love: dailyScore(sunSign.id,'love',today), career: dailyScore(sunSign.id,'career',today), wealth: dailyScore(sunSign.id,'wealth',today), social: dailyScore(sunSign.id,'social',today) }
+      const result = await getAIReading(buildAstrologyPrompt({ sunSign: sunSign.name, moonSign: moonSign?.name, risingSign: risingSign?.name, scores }))
       setAiGuide(result)
-    } catch {
-      setAiGuide('✦ 星光稍有遮蔽，请稍后再试')
-    }
+    } catch { setAiGuide('✦ 星光稍有遮蔽，请稍后再试') }
     setAiLoading(false)
   }
 
@@ -431,9 +462,8 @@ function FortuneTab({ sunSign, moonSign, risingSign, premium, onUpgrade }) {
   const dailyMsg = msgs[today.getDay() % msgs.length] || ''
   const color = ELCOL[sunSign.element]
   const dateLabel = today.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
-
   const scoreAreas = [
-    { key: 'love',   label: '爱情', icon: '♡', color: '#c44a5e' },
+    { key: 'love', label: '爱情', icon: '♡', color: '#c44a5e' },
     { key: 'career', label: '事业', icon: '★', color: '#2d4a3e' },
     { key: 'wealth', label: '财富', icon: '◈', color: '#c4924a' },
     { key: 'social', label: '人际', icon: '◎', color: '#3e6c8c' },
@@ -441,26 +471,15 @@ function FortuneTab({ sunSign, moonSign, risingSign, premium, onUpgrade }) {
 
   return (
     <div>
-      <div className="card-soft" style={{
-        padding: 16, marginBottom: 14,
-        background: `linear-gradient(135deg, ${color}10, #ffffff)`,
-        borderLeft: `4px solid ${color}`,
-      }}>
+      <div className="card-soft" style={{ padding: 16, marginBottom: 14, background: `linear-gradient(135deg, ${color}10, #ffffff)`, borderLeft: `4px solid ${color}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: '50%', background: color, color: '#fdf9f0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0,
-          }}>{sunSign.symbol}</div>
+          <div style={{ width: 48, height: 48, borderRadius: '50%', background: color, color: '#fdf9f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{sunSign.symbol}</div>
           <div>
-            <p className="section-sub" style={{ marginBottom: 2 }}>TODAY'S FORTUNE</p>
+            <p className="section-sub" style={{ marginBottom: 2 }}>今日天象</p>
             <p className="serif" style={{ fontSize: 15, color: '#2d2618' }}>{sunSign.name} · {dateLabel}</p>
           </div>
         </div>
-        {dailyMsg && (
-          <p style={{ fontSize: 12, color: '#3d3327', lineHeight: 1.8, marginTop: 12, fontStyle: 'italic' }}>
-            "{dailyMsg}"
-          </p>
-        )}
+        {dailyMsg && <p style={{ fontSize: 12, color: '#3d3327', lineHeight: 1.8, marginTop: 12, fontStyle: 'italic' }}>"{dailyMsg}"</p>}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
@@ -492,20 +511,7 @@ function FortuneTab({ sunSign, moonSign, risingSign, premium, onUpgrade }) {
       </div>
 
       <div className="card-soft" style={{ padding: 16, marginBottom: 14 }}>
-        <p className="section-sub" style={{ marginBottom: 10 }}>今日幸运元素</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-          {[{ l: '数字', v: sunSign.lucky.number }, { l: '颜色', v: sunSign.lucky.color },
-            { l: '宝石', v: sunSign.lucky.stone }, { l: '幸运日', v: sunSign.lucky.day }].map(item => (
-            <div key={item.l} style={{ textAlign: 'center', background: '#fdf9f0', padding: '10px 4px', borderRadius: 10 }}>
-              <p className="serif" style={{ fontSize: 14, color: '#c4924a', marginBottom: 2 }}>{item.v}</p>
-              <p style={{ fontSize: 9, color: '#8a7a5e' }}>{item.l}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="card-soft" style={{ padding: 16, marginBottom: 14 }}>
-        <p className="section-sub" style={{ marginBottom: 12 }}>本周能量走势</p>
+        <p className="section-sub" style={{ marginBottom: 10 }}>本周能量走势</p>
         <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 56 }}>
           {['一','二','三','四','五','六','日'].map((d, i) => {
             const dayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + i + 1)
@@ -513,10 +519,7 @@ function FortuneTab({ sunSign, moonSign, risingSign, premium, onUpgrade }) {
             const isToday = i === (today.getDay() + 6) % 7
             return (
               <div key={d} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                <div style={{
-                  width: '100%', height: `${(s - 50) * 1.1}px`,
-                  background: isToday ? color : `${color}40`, borderRadius: 3, minHeight: 4,
-                }} />
+                <div style={{ width: '100%', height: `${(s - 50) * 1.1}px`, background: isToday ? color : `${color}40`, borderRadius: 3, minHeight: 4 }} />
                 <span style={{ fontSize: 9, color: isToday ? color : '#8a7a5e', fontWeight: isToday ? 700 : 400 }}>周{d}</span>
               </div>
             )
@@ -524,47 +527,26 @@ function FortuneTab({ sunSign, moonSign, risingSign, premium, onUpgrade }) {
         </div>
       </div>
 
-      {/* AI Guide */}
-      <div className="card-soft" style={{
-        padding: 16,
-        background: premium ? 'linear-gradient(135deg, rgba(196,146,74,0.08), #ffffff)' : '#fefcf6',
-        borderLeft: '3px solid #c9973a',
-      }}>
+      <div className="card-soft" style={{ padding: 16, background: premium ? 'linear-gradient(135deg, rgba(196,146,74,0.08), #ffffff)' : '#fefcf6', borderLeft: '3px solid #c9973a' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <p style={{ fontSize: 12, color: '#c4924a', fontWeight: 600 }}>✨ AI 今日星盘指引</p>
           {!aiGuide && (
-            <button
-              onClick={handleAIGuide}
-              disabled={aiLoading}
-              style={{
-                background: premium
-                  ? 'linear-gradient(135deg, #c9973a, #e8c06a)'
-                  : 'rgba(196,146,74,0.15)',
-                border: 'none', borderRadius: 999, padding: '5px 12px',
-                color: premium ? '#fff' : '#c4924a',
-                fontSize: 11, cursor: 'pointer', opacity: aiLoading ? 0.6 : 1,
-              }}
-            >
+            <button onClick={handleAIGuide} disabled={aiLoading} style={{ background: premium ? 'linear-gradient(135deg, #c9973a, #e8c06a)' : 'rgba(196,146,74,0.15)', border: 'none', borderRadius: 999, padding: '5px 12px', color: premium ? '#fff' : '#c4924a', fontSize: 11, cursor: 'pointer', opacity: aiLoading ? 0.6 : 1 }}>
               {aiLoading ? '解读中…' : premium ? '生成指引' : '🔒 会员'}
             </button>
           )}
         </div>
-        {aiLoading && (
-          <p style={{ fontSize: 12, color: '#c4924a', animation: 'pulse-soft 1.5s ease-in-out infinite' }}>✦ 星光汇聚中…</p>
-        )}
-        {aiGuide ? (
-          <p className="animate-fade-up" style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9 }}>{aiGuide}</p>
-        ) : (
-          <p style={{ fontSize: 12, color: '#8a7a5e' }}>
-            {premium ? '点击右侧按钮，获取今日个性化星盘指引' : '升级会员，解锁 AI 深度星盘解读'}
-          </p>
-        )}
+        {aiLoading && <p style={{ fontSize: 12, color: '#c4924a', animation: 'pulse-soft 1.5s ease-in-out infinite' }}>✦ 星光汇聚中…</p>}
+        {aiGuide
+          ? <p className="animate-fade-up" style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9 }}>{aiGuide}</p>
+          : <p style={{ fontSize: 12, color: '#8a7a5e' }}>{premium ? '点击右侧按钮，获取今日个性化星盘指引' : '升级会员，解锁 AI 深度星盘解读'}</p>
+        }
       </div>
     </div>
   )
 }
 
-// ── Tab: 八字速览 ───────────────────────────────────────────────────────
+// ── Tab: 生辰（BaZi）─────────────────────────────────────────────────────────
 
 function PillarCell({ stemIdx, branchIdx, label, isDay }) {
   const stemEl = STEM_ELEMENTS[stemIdx]
@@ -593,22 +575,16 @@ function ElementBalanceBar({ counts }) {
     <div className="card-soft" style={{ padding: 16, marginBottom: 14 }}>
       <p className="section-sub" style={{ marginBottom: 12 }}>五行分布</p>
       <div style={{ display: 'flex', gap: 6, height: 50, alignItems: 'flex-end', marginBottom: 8 }}>
-        {elements.map(el => {
-          const pct = (counts[el] || 0) / total * 100
-          return (
-            <div key={el} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: '100%', height: `${Math.max(4, pct * 0.9)}px`, background: ELEMENT_COLORS[el], borderRadius: 3 }} />
-              <span style={{ fontSize: 10, color: ELEMENT_COLORS[el], fontWeight: 600 }}>{el}</span>
-            </div>
-          )
-        })}
+        {elements.map(el => (
+          <div key={el} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: '100%', height: `${Math.max(4, (counts[el] || 0) / total * 100 * 0.9)}px`, background: ELEMENT_COLORS[el], borderRadius: 3 }} />
+            <span style={{ fontSize: 10, color: ELEMENT_COLORS[el], fontWeight: 600 }}>{el}</span>
+          </div>
+        ))}
       </div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {elements.map(el => (
-          <span key={el} style={{
-            padding: '2px 10px', borderRadius: 999, fontSize: 10,
-            background: `${ELEMENT_COLORS[el]}15`, color: ELEMENT_COLORS[el],
-          }}>{el} × {counts[el] || 0}</span>
+          <span key={el} style={{ padding: '2px 10px', borderRadius: 999, fontSize: 10, background: `${ELEMENT_COLORS[el]}15`, color: ELEMENT_COLORS[el] }}>{el} × {counts[el] || 0}</span>
         ))}
       </div>
     </div>
@@ -637,8 +613,7 @@ function BaziTab({ year, month, day, hour }) {
           <p className="serif" style={{ fontSize: 16, color: '#2d2618', marginBottom: 6 }}>八字速览需要完整时间</p>
           <p style={{ fontSize: 12, color: '#8a7a5e', lineHeight: 1.8 }}>
             请在上方输入框补充填写<br />
-            {!hasYear && '📅 出生年份  '}
-            {!hasHour && '🕐 出生时辰（0–23时）'}
+            {!hasYear && '📅 出生年份  '}{!hasHour && '🕐 出生时辰（0–23时）'}
           </p>
         </div>
         <div className="card-soft" style={{ padding: 16 }}>
@@ -670,33 +645,20 @@ function BaziTab({ year, month, day, hour }) {
         </div>
         <p style={{ fontSize: 9, color: '#8a7a5e', marginTop: 10, textAlign: 'center' }}>★ 日柱天干为你的日主命格</p>
       </div>
-
-      <div className="card-soft" style={{
-        padding: 18, marginBottom: 14,
-        background: `linear-gradient(135deg, ${dmColor}08, #ffffff)`,
-        borderLeft: `4px solid ${dmColor}`,
-      }}>
+      <div className="card-soft" style={{ padding: 18, marginBottom: 14, background: `linear-gradient(135deg, ${dmColor}08, #ffffff)`, borderLeft: `4px solid ${dmColor}` }}>
         <p className="section-sub" style={{ marginBottom: 8 }}>日主分析</p>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-          <div style={{
-            width: 52, height: 52, borderRadius: 14, background: dmColor, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 26, color: '#fdf9f0', boxShadow: `0 6px 16px ${dmColor}40`,
-          }}>{STEMS[bazi.day.stemIdx]}</div>
+          <div style={{ width: 52, height: 52, borderRadius: 14, background: dmColor, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, color: '#fdf9f0', boxShadow: `0 6px 16px ${dmColor}40` }}>{STEMS[bazi.day.stemIdx]}</div>
           <div>
             <p className="serif" style={{ fontSize: 17, color: '#2d2618', marginBottom: 4 }}>{dayMaster.label}</p>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {dayMaster.traits.map(t => (
-                <span key={t} style={{ padding: '2px 8px', borderRadius: 999, fontSize: 10, background: `${dmColor}15`, color: dmColor }}>{t}</span>
-              ))}
+              {dayMaster.traits.map(t => <span key={t} style={{ padding: '2px 8px', borderRadius: 999, fontSize: 10, background: `${dmColor}15`, color: dmColor }}>{t}</span>)}
             </div>
           </div>
         </div>
         <p style={{ fontSize: 12, color: '#3d3327', lineHeight: 1.8 }}>{dayMaster.desc}</p>
       </div>
-
       <ElementBalanceBar counts={balance} />
-
       <div className="card-soft" style={{ padding: 16 }}>
         <p className="section-sub" style={{ marginBottom: 12 }}>大限（十年大运）</p>
         <div style={{ display: 'flex', gap: 0, overflowX: 'auto', paddingBottom: 4 }}>
@@ -704,10 +666,7 @@ function BaziTab({ year, month, day, hour }) {
             const sCol = ELEMENT_COLORS[STEM_ELEMENTS[period.stemIdx]]
             const bCol = ELEMENT_COLORS[BRANCH_ELEMENTS[period.branchIdx]]
             return (
-              <div key={i} style={{
-                minWidth: 46, textAlign: 'center', padding: '8px 2px',
-                borderRight: i < daYun.length - 1 ? '1px solid rgba(196,146,74,0.1)' : 'none',
-              }}>
+              <div key={i} style={{ minWidth: 46, textAlign: 'center', padding: '8px 2px', borderRight: i < daYun.length - 1 ? '1px solid rgba(196,146,74,0.1)' : 'none' }}>
                 <p style={{ fontSize: 9, color: '#8a7a5e', marginBottom: 4 }}>{period.startAge}岁</p>
                 <p style={{ fontSize: 20, fontWeight: 700, color: sCol, lineHeight: 1 }}>{STEMS[period.stemIdx]}</p>
                 <p style={{ fontSize: 20, fontWeight: 700, color: bCol, lineHeight: 1 }}>{BRANCHES[period.branchIdx]}</p>
@@ -721,7 +680,115 @@ function BaziTab({ year, month, day, hour }) {
   )
 }
 
-// ── Tab: 星座配对 (Compatibility) ────────────────────────────────────────
+// ── Tab: 紫微 ────────────────────────────────────────────────────────────────
+
+function ZiWeiTab({ year, month, day }) {
+  const hasData = month && day && year && parseInt(year) > 1900
+
+  if (!hasData) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+        <p style={{ fontSize: 36, marginBottom: 12 }}>✦</p>
+        <p className="serif" style={{ fontSize: 16, color: '#2d2618', marginBottom: 8 }}>需要完整出生日期</p>
+        <p style={{ fontSize: 12, color: '#8a7a5e', lineHeight: 1.8 }}>请填写出生年月日，即可生成紫微命盘</p>
+      </div>
+    )
+  }
+
+  const yr = parseInt(year), mo = parseInt(month), dy = parseInt(day)
+  const { mingGongIdx, starPlacement } = getZiWeiData(yr, mo, dy)
+
+  function getPalaceName(branchIdx) {
+    return PALACE_NAMES[(branchIdx - mingGongIdx + 12) % 12]
+  }
+
+  function PalaceCell({ b, gridRow, gridColumn, ageStart }) {
+    const isMinGong = b === mingGongIdx
+    const palaceName = getPalaceName(b)
+    const stars = starPlacement[b] || []
+    return (
+      <div style={{
+        gridRow, gridColumn,
+        background: isMinGong ? '#1a1808' : '#0e1420',
+        border: `1px solid ${isMinGong ? '#3a3010' : '#1a2830'}`,
+        padding: '6px 5px',
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+      }}>
+        <div>
+          {stars.slice(0, 3).map(s => (
+            <div key={s} style={{ fontSize: 8, color: STAR_COLORS[s], lineHeight: 1.5, fontWeight: 500 }}>{s}</div>
+          ))}
+        </div>
+        <div>
+          <div style={{ fontSize: 7, color: '#3a5040', marginBottom: 1 }}>{ageStart}–{ageStart + 9}岁</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ fontSize: 8.5, color: '#4a7060' }}>{ZW_BRANCHES[b]}</span>
+            <span style={{ fontSize: 8.5, color: isMinGong ? '#e8c060' : '#8aaa80', fontWeight: isMinGong ? 700 : 400 }}>
+              {palaceName}
+            </span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const ageMap = [5, 15, 25, 35, 45, 55, 65, 75, 85, 95, 105, 115]
+
+  return (
+    <div className="animate-fade-up">
+      <p style={{ fontSize: 10, color: '#c4924a', letterSpacing: '0.2em', fontWeight: 600, marginBottom: 8 }}>
+        ✦ 紫微斗数 · 本命盘
+      </p>
+      <p style={{ fontSize: 11, color: '#8a7a5e', lineHeight: 1.7, marginBottom: 14 }}>
+        十二宫位 · 主星分布 · 简化示意
+      </p>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateRows: 'repeat(4, 72px)',
+        gap: 2,
+        background: '#060c0a',
+        borderRadius: 10,
+        overflow: 'hidden',
+        border: '1px solid #182820',
+        marginBottom: 16,
+      }}>
+        {ZW_GRID.map((pos, i) => (
+          <PalaceCell key={pos.b} b={pos.b} gridRow={pos.r} gridColumn={pos.c} ageStart={ageMap[i] || 5} />
+        ))}
+        <div style={{
+          gridRow: '2 / span 2', gridColumn: '2 / span 2',
+          background: '#080e18',
+          border: '1px solid #182830',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+          gap: 6, padding: 10,
+        }}>
+          <p style={{ fontSize: 9.5, color: '#6a9878', fontWeight: 600 }}>本命盘</p>
+          <p style={{ fontSize: 8, color: '#4a7060' }}>{yr}年{mo}月{dy}日</p>
+          <p style={{ fontSize: 8, color: '#3a5840' }}>命宫 · {ZW_BRANCHES[mingGongIdx]}</p>
+          <p style={{ fontSize: 7.5, color: '#2a4030', textAlign: 'center', lineHeight: 1.6 }}>
+            {PALACE_NAMES[0]}在{ZW_BRANCHES[mingGongIdx]}
+          </p>
+        </div>
+      </div>
+
+      <div className="card-soft" style={{ padding: 14 }}>
+        <p className="section-sub" style={{ marginBottom: 8 }}>紫微主星</p>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {MAIN_STARS.map(s => (
+            <span key={s} style={{
+              fontSize: 10, color: STAR_COLORS[s], padding: '2px 8px', borderRadius: 999,
+              background: 'rgba(255,255,255,0.04)', border: `1px solid ${STAR_COLORS[s]}30`,
+            }}>{s}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Tab: 配对（Compat）───────────────────────────────────────────────────────
 
 const COMPAT_SCORES = {
   aries:       { taurus:60, gemini:85, cancer:55, leo:92, virgo:62, libra:78, scorpio:70, sagittarius:90, capricorn:58, aquarius:80, pisces:65, aries:75 },
@@ -737,30 +804,18 @@ const COMPAT_SCORES = {
   aquarius:    { aries:80, taurus:62, gemini:90, cancer:60, leo:72, virgo:68, libra:88, scorpio:65, sagittarius:85, capricorn:70, pisces:72, aquarius:75 },
   pisces:      { aries:65, taurus:82, gemini:72, cancer:92, leo:68, virgo:70, libra:75, scorpio:92, sagittarius:70, capricorn:78, aquarius:72, pisces:78 },
 }
-
-const COMPAT_DIMS = ['love', 'comm', 'values', 'passion']
-const COMPAT_DIM_LABELS = { love: '爱情', comm: '沟通', values: '价值观', passion: '激情' }
-const COMPAT_DIM_COLORS = { love: '#c44a5e', comm: '#2d4a3e', values: '#c4924a', passion: '#7a3e6c' }
-
+const COMPAT_DIMS = ['love','comm','values','passion']
+const COMPAT_DIM_LABELS = { love:'爱情', comm:'沟通', values:'价值观', passion:'激情' }
+const COMPAT_DIM_COLORS = { love:'#c44a5e', comm:'#2d4a3e', values:'#c4924a', passion:'#7a3e6c' }
 function getCompatDimScores(base) {
-  return {
-    love: Math.min(99, base + (base % 7) - 3),
-    comm: Math.min(99, base - (base % 5) + 2),
-    values: Math.min(99, base + (base % 11) - 5),
-    passion: Math.min(99, base - (base % 13) + 4),
-  }
+  return { love: Math.min(99, base + (base % 7) - 3), comm: Math.min(99, base - (base % 5) + 2), values: Math.min(99, base + (base % 11) - 5), passion: Math.min(99, base - (base % 13) + 4) }
 }
 
 function CompatTab({ sunSignId }) {
   const [partnerMonth, setPartnerMonth] = useState('')
   const [partnerDay, setPartnerDay] = useState('')
   const [result, setResult] = useState(null)
-
-  const inputStyle = {
-    width: '100%', padding: '12px 12px',
-    background: '#fff', border: '1px solid rgba(196,146,74,0.25)',
-    borderRadius: 12, color: '#2d2618', fontSize: 15,
-  }
+  const inputStyle = { width: '100%', padding: '12px 12px', background: '#fff', border: '1px solid rgba(196,146,74,0.25)', borderRadius: 12, color: '#2d2618', fontSize: 15 }
 
   function handleCheck() {
     tap()
@@ -769,8 +824,7 @@ function CompatTab({ sunSignId }) {
     const mySign = SIGNS.find(s => s.id === sunSignId)
     const partnerSign = SIGNS.find(s => s.id === partnerId)
     const base = COMPAT_SCORES[sunSignId]?.[partnerId] || 72
-    const dims = getCompatDimScores(base)
-    setResult({ mySign, partnerSign, base, dims })
+    setResult({ mySign, partnerSign, base, dims: getCompatDimScores(base) })
   }
 
   if (!sunSignId) {
@@ -784,17 +838,12 @@ function CompatTab({ sunSignId }) {
   }
 
   const mySelf = SIGNS.find(s => s.id === sunSignId)
-
   return (
     <div className="animate-fade-up">
       <div className="card-soft" style={{ padding: 18, marginBottom: 14 }}>
         <p className="section-sub" style={{ marginBottom: 14 }}>COMPATIBILITY · 星座配对</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-          <div style={{
-            width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
-            background: `${ELCOL[mySelf?.element]}20`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
-          }}>{mySelf?.symbol}</div>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', flexShrink: 0, background: `${ELCOL[mySelf?.element]}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>{mySelf?.symbol}</div>
           <div style={{ flex: 1, textAlign: 'center', fontSize: 20, color: '#c4924a' }}>♡</div>
           <div style={{ width: 52, height: 52, borderRadius: '50%', flexShrink: 0, background: '#f0e8d6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>
             {result ? result.partnerSign?.symbol : '?'}
@@ -802,54 +851,24 @@ function CompatTab({ sunSignId }) {
         </div>
         <p style={{ fontSize: 12, color: '#5a4a3a', marginBottom: 12 }}>输入TA的生日</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-          <label>
-            <span style={{ fontSize: 10, color: '#8a7a5e', display: 'block', marginBottom: 5 }}>月份</span>
-            <input type="number" min="1" max="12" value={partnerMonth} onChange={e => setPartnerMonth(e.target.value)} placeholder="1–12" style={inputStyle} />
-          </label>
-          <label>
-            <span style={{ fontSize: 10, color: '#8a7a5e', display: 'block', marginBottom: 5 }}>日期</span>
-            <input type="number" min="1" max="31" value={partnerDay} onChange={e => setPartnerDay(e.target.value)} placeholder="1–31" style={inputStyle} />
-          </label>
+          <label><span style={{ fontSize: 10, color: '#8a7a5e', display: 'block', marginBottom: 5 }}>月份</span><input type="number" min="1" max="12" value={partnerMonth} onChange={e => setPartnerMonth(e.target.value)} placeholder="1–12" style={inputStyle} /></label>
+          <label><span style={{ fontSize: 10, color: '#8a7a5e', display: 'block', marginBottom: 5 }}>日期</span><input type="number" min="1" max="31" value={partnerDay} onChange={e => setPartnerDay(e.target.value)} placeholder="1–31" style={inputStyle} /></label>
         </div>
-        <button
-          onClick={handleCheck}
-          className="btn-primary"
-          style={{ width: '100%', opacity: (partnerMonth && partnerDay) ? 1 : 0.45 }}
-          disabled={!partnerMonth || !partnerDay}
-        >
-          ♡ 测试缘分
-        </button>
+        <button onClick={handleCheck} className="btn-primary" style={{ width: '100%', opacity: (partnerMonth && partnerDay) ? 1 : 0.45 }} disabled={!partnerMonth || !partnerDay}>♡ 测试缘分</button>
       </div>
-
       {result && (
         <div className="animate-fade-up">
-          <div className="card-soft" style={{
-            padding: 20, marginBottom: 14,
-            background: `linear-gradient(135deg, ${ELCOL[result.mySign?.element]}08, ${ELCOL[result.partnerSign?.element]}08)`,
-          }}>
+          <div className="card-soft" style={{ padding: 20, marginBottom: 14, background: `linear-gradient(135deg, ${ELCOL[result.mySign?.element]}08, ${ELCOL[result.partnerSign?.element]}08)` }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+              <div style={{ textAlign: 'center' }}><div style={{ fontSize: 32 }}>{result.mySign?.symbol}</div><p style={{ fontSize: 12, color: '#2d2618', fontWeight: 500 }}>{result.mySign?.name}</p></div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32 }}>{result.mySign?.symbol}</div>
-                <p style={{ fontSize: 12, color: '#2d2618', fontWeight: 500 }}>{result.mySign?.name}</p>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div className="serif" style={{
-                  fontSize: 36, color: '#c4924a',
-                  lineHeight: 1, marginBottom: 4,
-                }}>{result.base}</div>
-                <div style={{
-                  fontSize: 9, background: result.base >= 85 ? '#c4924a' : result.base >= 70 ? '#2d4a3e' : '#8a7a5e',
-                  color: '#fff', padding: '2px 8px', borderRadius: 999,
-                }}>
+                <div className="serif" style={{ fontSize: 36, color: '#c4924a', lineHeight: 1, marginBottom: 4 }}>{result.base}</div>
+                <div style={{ fontSize: 9, background: result.base >= 85 ? '#c4924a' : result.base >= 70 ? '#2d4a3e' : '#8a7a5e', color: '#fff', padding: '2px 8px', borderRadius: 999 }}>
                   {result.base >= 85 ? '天作之合' : result.base >= 70 ? '相当契合' : result.base >= 55 ? '潜力匹配' : '需要磨合'}
                 </div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32 }}>{result.partnerSign?.symbol}</div>
-                <p style={{ fontSize: 12, color: '#2d2618', fontWeight: 500 }}>{result.partnerSign?.name}</p>
-              </div>
+              <div style={{ textAlign: 'center' }}><div style={{ fontSize: 32 }}>{result.partnerSign?.symbol}</div><p style={{ fontSize: 12, color: '#2d2618', fontWeight: 500 }}>{result.partnerSign?.name}</p></div>
             </div>
-
             {COMPAT_DIMS.map(dim => {
               const score = result.dims[dim]
               const color = COMPAT_DIM_COLORS[dim]
@@ -860,24 +879,19 @@ function CompatTab({ sunSignId }) {
                     <span style={{ fontSize: 12, color, fontWeight: 600 }}>{score}</span>
                   </div>
                   <div style={{ height: 6, background: '#f0e8d6', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: `${score}%`,
-                      background: `linear-gradient(90deg, ${color}80, ${color})`,
-                      borderRadius: 3, transition: 'width 0.8s ease-out',
-                    }} />
+                    <div style={{ height: '100%', width: `${score}%`, background: `linear-gradient(90deg, ${color}80, ${color})`, borderRadius: 3, transition: 'width 0.8s ease-out' }} />
                   </div>
                 </div>
               )
             })}
           </div>
-
           <div className="card-soft" style={{ padding: 16, borderLeft: '3px solid #c4924a' }}>
             <p style={{ fontSize: 11, color: '#c4924a', marginBottom: 6, fontWeight: 600 }}>✦ 缘分解读</p>
             <p style={{ fontSize: 13, color: '#3d3327', lineHeight: 1.9 }}>
               {result.mySign?.name}与{result.partnerSign?.name}的组合综合匹配度{result.base}分。
               {result.base >= 85 ? `这对组合在能量频率上高度共鸣，${result.mySign?.element}与${result.partnerSign?.element}相互滋养，感情基础稳固。` :
-               result.base >= 70 ? `两人性格互补，在沟通和价值观上有较多共鸣，需要彼此多一些理解和包容。` :
-               `两人性格差异明显，但差异也是成长的机会。只要双方愿意努力，感情可以磨出独特的火花。`}
+               result.base >= 70 ? '两人性格互补，在沟通和价值观上有较多共鸣，需要彼此多一些理解和包容。' :
+               '两人性格差异明显，但差异也是成长的机会。只要双方愿意努力，感情可以磨出独特的火花。'}
             </p>
           </div>
         </div>
@@ -886,32 +900,32 @@ function CompatTab({ sunSignId }) {
   )
 }
 
-// ── Main Component ──────────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function Astrology() {
-  const [tab, setTab] = useState('zodiac')
+  const [tab, setTab] = useState('natal')
   const [month, setMonth] = useState('')
   const [day, setDay] = useState('')
   const [year, setYear] = useState('')
   const [hour, setHour] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [browsing, setBrowsing] = useState(null)
+  const [showPremium, setShowPremium] = useState(false)
+  const [premium] = useState(isPremium)
 
-  // Pre-fill from saved birth data
   useEffect(() => {
     const birth = getUserBirth()
     if (birth) {
       if (birth.month) setMonth(String(birth.month))
-      if (birth.day) setDay(String(birth.day))
-      if (birth.year) setYear(String(birth.year))
+      if (birth.day)   setDay(String(birth.day))
+      if (birth.year)  setYear(String(birth.year))
       if (birth.hour !== null && birth.hour !== undefined) setHour(String(birth.hour))
       setSubmitted(true)
     }
   }, [])
 
   const sunSignId = submitted && month && day ? getZodiacByDate(month, day) : null
-  const sunSign = sunSignId ? SIGNS.find(s => s.id === sunSignId) : null
+  const sunSign   = sunSignId ? SIGNS.find(s => s.id === sunSignId) : null
 
   const moonSignIdx = useMemo(() => {
     if (!submitted || !year || !month || !day) return null
@@ -921,8 +935,7 @@ export default function Astrology() {
 
   const risingSignIdx = useMemo(() => {
     if (!submitted || !sunSignId || hour === '') return null
-    const sunIdx = SIGN_ORDER.indexOf(sunSignId)
-    return getRisingSignIdx(sunIdx, hour)
+    return getRisingSignIdx(SIGN_ORDER.indexOf(sunSignId), hour)
   }, [submitted, sunSignId, hour])
   const risingSign = risingSignIdx !== null ? SIGNS[risingSignIdx] : null
 
@@ -930,34 +943,19 @@ export default function Astrology() {
     e?.preventDefault()
     if (!month || !day) return
     setSubmitting(true)
-    saveUserBirth({
-      month: parseInt(month),
-      day: parseInt(day),
-      year: year ? parseInt(year) : null,
-      hour: hour !== '' ? parseInt(hour) : null,
-    })
-    setTimeout(() => {
-      setSubmitted(true)
-      setBrowsing(null)
-      setSubmitting(false)
-    }, 600)
+    saveUserBirth({ month: parseInt(month), day: parseInt(day), year: year ? parseInt(year) : null, hour: hour !== '' ? parseInt(hour) : null })
+    setTimeout(() => { setSubmitted(true); setSubmitting(false) }, 500)
   }
-
-  const [showPremium, setShowPremium] = useState(false)
-  const [premium] = useState(isPremium)
 
   const TABS = [
-    { id: 'zodiac', label: '星座分析' },
-    { id: 'fortune', label: '今日运势' },
-    { id: 'bazi', label: '八字速览' },
-    { id: 'compat', label: '⭐ 配对' },
+    { id: 'natal',   label: '本命盘' },
+    { id: 'sky',     label: '天象' },
+    { id: 'shichen', label: '生辰' },
+    { id: 'ziwei',   label: '紫微' },
+    { id: 'compat',  label: '配对' },
   ]
 
-  const inputStyle = {
-    width: '100%', padding: '10px 10px',
-    background: '#fdf9f0', border: '1px solid rgba(196,146,74,0.25)',
-    borderRadius: 10, color: '#2d2618', fontSize: 14,
-  }
+  const inputStyle = { width: '100%', padding: '10px 10px', background: '#fdf9f0', border: '1px solid rgba(196,146,74,0.25)', borderRadius: 10, color: '#2d2618', fontSize: 14 }
 
   return (
     <div className="animate-fade-in pb-nav" style={{ padding: '40px 18px 0', maxWidth: 520, margin: '0 auto' }}>
@@ -966,16 +964,15 @@ export default function Astrology() {
         <h1 className="serif" style={{ fontSize: 26, color: '#2d2618' }}>星座星盘</h1>
       </div>
 
-      {/* Input Card */}
       <div className="card-soft" style={{ padding: 18, marginBottom: 16 }}>
         <p style={{ fontSize: 12, color: '#5a4a3a', marginBottom: 12 }}>输入出生信息，解读你的星座命盘</p>
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
             {[
-              { key: 'month', label: '月份 *', val: month, setter: setMonth, min: 1, max: 12, ph: '月' },
-              { key: 'day',   label: '日期 *', val: day,   setter: setDay,   min: 1, max: 31, ph: '日' },
+              { key: 'month', label: '月份 *', val: month, setter: setMonth, min: 1,    max: 12,   ph: '月' },
+              { key: 'day',   label: '日期 *', val: day,   setter: setDay,   min: 1,    max: 31,   ph: '日' },
               { key: 'year',  label: '年份',   val: year,  setter: setYear,  min: 1900, max: 2099, ph: '年' },
-              { key: 'hour',  label: '时辰(时)', val: hour, setter: setHour, min: 0, max: 23, ph: '时' },
+              { key: 'hour',  label: '时辰(时)',val: hour,  setter: setHour,  min: 0,    max: 23,   ph: '时' },
             ].map(f => (
               <div key={f.key}>
                 <label style={{ fontSize: 9, color: '#8a7a5e', display: 'block', marginBottom: 4 }}>{f.label}</label>
@@ -985,22 +982,13 @@ export default function Astrology() {
               </div>
             ))}
           </div>
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={submitting}
-            style={{
-              width: '100%', padding: '11px 0',
-              opacity: submitting ? 0.8 : 1,
-              transition: 'opacity 0.2s ease',
-            }}
-          >
-            {submitting ? (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>✦</span>
-                解析中…
-              </span>
-            ) : '✦ 解析命盘'}
+          <button type="submit" className="btn-primary" disabled={submitting}
+            style={{ width: '100%', padding: '11px 0', opacity: submitting ? 0.8 : 1, transition: 'opacity 0.2s ease' }}>
+            {submitting
+              ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>✦</span>解析中…
+                </span>
+              : '✦ 解析命盘'}
           </button>
         </form>
         {submitted && sunSign && (
@@ -1012,30 +1000,48 @@ export default function Astrology() {
         )}
       </div>
 
-      {/* Tab Bar */}
-      <div style={{ background: '#fdf9f0', borderRadius: 999, padding: 4, display: 'flex', gap: 4, marginBottom: 20 }}>
+      <div style={{ background: '#fdf9f0', borderRadius: 999, padding: 4, display: 'flex', gap: 3, marginBottom: 20 }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => { tap(); setTab(t.id) }} style={{
-            flex: 1, padding: '9px 4px', borderRadius: 999, border: 'none', cursor: 'pointer',
+            flex: 1, padding: '9px 2px', borderRadius: 999, border: 'none', cursor: 'pointer',
             background: tab === t.id ? '#2d4a3e' : 'transparent',
             color: tab === t.id ? '#fdf9f0' : '#5a4a3a',
-            fontSize: 12, fontWeight: tab === t.id ? 600 : 400,
+            fontSize: 11, fontWeight: tab === t.id ? 600 : 400,
             transition: 'all 0.25s ease',
           }}>{t.label}</button>
         ))}
       </div>
 
-      {tab === 'zodiac' && (
-        <ZodiacTab sunSign={sunSign} moonSign={moonSign} risingSign={risingSign} browsing={browsing} setBrowsing={setBrowsing} />
+      {tab === 'natal' && (
+        sunSign ? (
+          <div className="animate-fade-up">
+            <div style={{ marginBottom: 20 }}><NatalChart year={year} month={month} day={day} /></div>
+            <ThreePillars sunSign={sunSign} moonSign={moonSign} risingSign={risingSign} />
+            <PlanetTable year={year} month={month} day={day} />
+            <FortuneChart sunSign={sunSign} moonSign={moonSign} risingSign={risingSign} />
+            {sunSign && <SignDetailPanel sign={sunSign} />}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{ marginBottom: 20 }}><NatalChart year={new Date().getFullYear()} month={new Date().getMonth()+1} day={new Date().getDate()} /></div>
+            <p className="serif" style={{ fontSize: 16, color: '#2d2618', marginBottom: 8 }}>请先输入出生月日</p>
+            <p style={{ fontSize: 12, color: '#8a7a5e' }}>填写上方月份和日期，解析你的本命盘</p>
+          </div>
+        )
       )}
-      {tab === 'fortune' && (
-        <FortuneTab
-          sunSign={sunSign} moonSign={moonSign} risingSign={risingSign}
-          premium={premium} onUpgrade={() => setShowPremium(true)}
-        />
+
+      {tab === 'sky' && (
+        <div className="animate-fade-up">
+          <div style={{ marginBottom: 20 }}>
+            <NatalChart year={new Date().getFullYear()} month={new Date().getMonth()+1} day={new Date().getDate()} isToday />
+          </div>
+          <FortuneTab sunSign={sunSign} moonSign={moonSign} risingSign={risingSign} premium={premium} onUpgrade={() => setShowPremium(true)} />
+        </div>
       )}
-      {tab === 'bazi' && <BaziTab year={year} month={month} day={day} hour={hour} />}
-      {tab === 'compat' && (
+
+      {tab === 'shichen' && <BaziTab year={year} month={month} day={day} hour={hour} />}
+      {tab === 'ziwei'   && <ZiWeiTab year={year} month={month} day={day} />}
+      {tab === 'compat'  && (
         <PremiumGate feature="星座配对分析 · 四维度匹配">
           <CompatTab sunSignId={sunSignId} />
         </PremiumGate>
@@ -1043,9 +1049,7 @@ export default function Astrology() {
 
       <div style={{ height: 60 }} />
 
-      {showPremium && (
-        <PremiumSheet onClose={() => setShowPremium(false)} />
-      )}
+      {showPremium && <PremiumSheet onClose={() => setShowPremium(false)} />}
     </div>
   )
 }
