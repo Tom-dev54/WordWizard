@@ -70,7 +70,7 @@ export default function CardDetailSheet({ card, onClose, onJournal }) {
 
         <div style={{ flex: 1, paddingTop: 6 }}>
           <p style={{ fontSize: 10, color: '#c4924a', letterSpacing: '0.22em', marginBottom: 6, fontWeight: 600 }}>
-            TODAY'S CARD · {card.number}
+            今日之牌 · {card.number}
           </p>
           <h2 className="serif" style={{ fontSize: 27, color: '#2d2618', lineHeight: 1.2, marginBottom: 5 }}>
             {card.nameCN}

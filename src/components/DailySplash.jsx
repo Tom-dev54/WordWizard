@@ -152,7 +152,7 @@ export default function DailySplash({ onDone }) {
           letterSpacing: '0.22em', marginBottom: 14, fontWeight: 600,
           opacity: phase >= 2 ? 1 : 0, transition: 'opacity 0.5s ease 0.3s',
         }}>
-          TODAY'S INTENTION
+          今日意图
         </p>
 
         <p className="serif" style={{
