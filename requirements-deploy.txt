@@ -1,0 +1,7 @@
+gradio>=4.40
+pandas
+numpy
+matplotlib
+requests
+openai
+python-dotenv

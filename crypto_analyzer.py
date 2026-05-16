@@ -858,9 +858,13 @@ with gr.Blocks(title="加密货币智能交易分析器", css=CSS,
         </script>""")
 
 if __name__ == "__main__":
+    # share=True 在本机/服务器上创建公网链接
+    # 在 Replit / HF Spaces 上设为 False（平台自动提供 URL）
+    _share = os.environ.get("GRADIO_SHARE", "true").lower() == "true"
+    _port  = int(os.environ.get("GRADIO_SERVER_PORT", "7861"))
     demo.queue().launch(
         server_name="0.0.0.0",
-        server_port=7861,
-        share=True,
+        server_port=_port,
+        share=_share,
         show_error=True,
     )
