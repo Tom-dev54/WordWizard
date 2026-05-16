@@ -1,7 +1,8 @@
-run = "pip install -r requirements-deploy.txt -q && python crypto_analyzer.py"
+run = "pip install -r requirements.txt -q && python crypto_analyzer.py"
 entrypoint = "crypto_analyzer.py"
 language = "python3"
 
 [env]
 GRADIO_SERVER_NAME = "0.0.0.0"
 GRADIO_SERVER_PORT = "7861"
+GRADIO_SHARE = "false"

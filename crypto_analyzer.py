@@ -14,11 +14,15 @@ import numpy as np
 import pandas as pd
 import requests
 import gradio as gr
-from dotenv import load_dotenv
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DeepSeek AI 接入方式说明：
+#   DeepSeek 兼容 OpenAI SDK，只需改 base_url 即可，不需要任何 SparkAI 包。
+#   在 Replit 中：左侧 Secrets 添加 DEEPSEEK_API_KEY，程序自动读取。
+# ──────────────────────────────────────────────────────────────────────────────
 from openai import OpenAI
 
 warnings.filterwarnings('ignore')
-load_dotenv()
 
 # ─── DeepSeek AI ──────────────────────────────────────────────────────────────
 _DEEPSEEK_KEY = os.getenv("DEEPSEEK_API_KEY", "")

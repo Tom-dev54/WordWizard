@@ -1,46 +1,23 @@
-# WordWizard
+# 加密货币智能交易分析器
 
-## 项目简介
-WordWizard 是一个创新的背单词应用程序，旨在通过生成荒谬而反直觉的故事和相关图片来帮助用户记忆单词。该项目使用了讯飞星火大模型 API，结合 Gradio 提供的用户交互界面，实现了一个功能强大的学习工具。
+实时行情 + 技术指标 + 市场情绪 + DeepSeek AI 综合分析。
+
+## 在 Replit 上运行
+
+1. 点击右上角 **Run** 按钮，等待依赖安装
+2. 左侧 **Secrets** 添加：
+   - Key: `DEEPSEEK_API_KEY`，Value: 你的 DeepSeek API Key
+3. 顶部 webview 出现后点击链接，手机浏览器可直接访问
 
 ## 功能
-- 根据用户输入的单词生成荒谬而有趣的故事。
-- 根据故事内容生成相关的漫画风格图片。
-- 提供图片理解功能，确保生成的图片与故事内容高度匹配。
-- 允许用户上传文件，从文件中随机选择单词进行记忆。
-- 提供多种参数调节选项，以优化输出内容。
+- 自动扫描市场：热门榜 / 涨幅榜 / 跌幅榜 / 快进快出榜
+- 技术指标：RSI、MACD、布林带、EMA20/50、ATR
+- 市场情绪：恐惧贪婪指数、资金费率、多空比
+- AI 综合分析：DeepSeek 给出开多/开空/杠杆/止损止盈建议
+- 根据本金自动计算仓位
 
-## 安装说明
+## AI 接入说明
+使用 **DeepSeek API**（兼容 OpenAI SDK，非 SparkAI）。
+代码中的 `from openai import OpenAI` + `base_url="https://api.deepseek.com"` 是 DeepSeek 的标准接入方式。
 
-### 前提条件
-- Python 3.7 及以上版本
-- Git
-
-### 克隆仓库
-```bash
-git clone https://github.com/你的用户名/WordWizard.git
-cd WordWizard
-
-###创建虚拟环境并安装依赖
-python -m venv my_project_env
-source my_project_env/bin/activate  # 在 Windows 上使用 `my_project_env\Scripts\activate`
-pip install -r requirements.txt
-
-###配置环境变量
-在项目根目录创建一个 .env 文件，并添加以下内容：
-SPARKAI_APP_ID=你的APP_ID
-SPARKAI_API_KEY=你的API_KEY
-SPARKAI_API_SECRET=你的API_SECRET
-
-#使用指南
-##运行应用
-python app.py
-
-##交互界面
-在浏览器中打开 http://127.0.0.1:7860 访问 Gradio 提供的用户界面。
-
-##生成故事和图片
-1.输入你想要记忆的单词（建议输入30个单词）。
-2.（可选）输入用于生成故事和图片的提示词。
-3.调节生成内容的参数（如最大生成长度）。
-4.点击“生成”按钮，等待生成结果。
+⚠️ 仅供参考，不构成投资建议。加密货币有极高风险。
