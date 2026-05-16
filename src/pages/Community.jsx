@@ -442,8 +442,7 @@ function SettingsSheet({ onClose }) {
 
 export default function Community() {
   const [posts, setPosts] = useState(getPosts())
-  const [activeCategory, setActiveCategory] = useState('')
-  useEffect(() => { setActiveCategory('all') }, [])
+  const [activeCategory, setActiveCategory] = useState('tarot')
   const [activeTag, setActiveTag] = useState(null)
   const [searchText, setSearchText] = useState('')
   const [savedIds, setSavedIds] = useState(getSavedPosts())
@@ -473,7 +472,7 @@ export default function Community() {
 
   const filtered = posts.filter(p => {
     if (activeCategory === 'saved') return savedIds.includes(p.id)
-    const catOk = activeCategory === 'all' || p.category === activeCategory
+    const catOk = p.category === activeCategory
     const tagOk = !activeTag || (p.tags || []).includes(activeTag)
     const txtOk = !searchText || p.title.includes(searchText) || p.content.includes(searchText)
     return catOk && tagOk && txtOk
@@ -524,7 +523,7 @@ export default function Community() {
       />
 
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden', marginBottom: 10, paddingBottom: 2 }}>
-        {[...CATEGORIES, { id: 'saved', label: '★ 已保存' }].map(cat => (
+        {[...CATEGORIES.filter(c => c.id !== 'all'), { id: 'saved', label: '★ 已保存' }].map(cat => (
           <button
             key={cat.id}
             onClick={() => { tap(); setActiveCategory(cat.id); setActiveTag(null) }}
