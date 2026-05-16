@@ -135,26 +135,24 @@ function CardDetailSheet({ card, reversed, onClose }) {
   )
 }
 
-function SaveJournalSheet({ spread, cards, onClose, onSaved }) {
-  const [note, setNote] = useState('')
-  const [question, setQuestion] = useState('')
+function SaveJournalSheet({ spread, cards, onClose, onSaved, onDeepen }) {
+  const [mood, setMood] = useState('')
 
   return (
     <Sheet onClose={onClose}>
       {(dismiss) => {
-        function handleSave() {
+        function doSave() {
           const journal = getJournal()
           if (journal.length >= 10 && !isPremium()) {
             dismiss()
             onSaved('limit')
-            return
+            return false
           }
           saveReading({
             type: 'spread',
             spreadName: spread.name,
             spreadId: spread.id,
-            question,
-            note,
+            mood,
             cards: cards.map((c, i) => ({
               cardId: c.card.id,
               cardName: c.card.nameCN,
@@ -162,52 +160,70 @@ function SaveJournalSheet({ spread, cards, onClose, onSaved }) {
               position: spread.positions[i],
             })),
           })
-          onSaved()
-          dismiss()
+          return true
+        }
+
+        function handleSave() {
+          if (doSave()) { onSaved(); dismiss() }
+        }
+
+        function handleDeepen() {
+          if (doSave()) { dismiss(); onDeepen() }
         }
 
         return (
           <>
             <div className="sheet-handle" />
             <h3 className="serif" style={{ fontSize: 20, color: '#2d2618', marginBottom: 4 }}>记入日志</h3>
-            <p style={{ fontSize: 12, color: '#8a7a5e', marginBottom: 18 }}>
-              保存这次占卜，方便日后回顾与思考
+            <p style={{ fontSize: 12, color: '#8a7a5e', marginBottom: 16 }}>
+              写下此刻的心情与困惑，和牌面一起留存
             </p>
 
             <label style={{ display: 'block', marginBottom: 14 }}>
-              <span style={{ fontSize: 11, color: '#5a4a3a', display: 'block', marginBottom: 6 }}>问题（可选）</span>
-              <input
-                value={question}
-                onChange={e => setQuestion(e.target.value)}
-                placeholder="此次占卜你想问什么？"
+              <span style={{ fontSize: 11, color: '#5a4a3a', display: 'block', marginBottom: 6 }}>此刻心情 · 困惑（可选）</span>
+              <textarea
+                value={mood}
+                onChange={e => setMood(e.target.value)}
+                placeholder="今天发生了什么？你在担忧什么？把它写下来…"
+                rows={4}
+                autoFocus
                 style={{
                   width: '100%', padding: '12px 14px',
                   background: '#fff',
-                  border: '1px solid rgba(196,146,74,0.25)',
-                  borderRadius: 12, color: '#2d2618', fontSize: 14,
+                  border: '1px solid rgba(196,146,74,0.3)',
+                  borderRadius: 12, color: '#2d2618',
+                  fontSize: 13, lineHeight: 1.8, resize: 'none',
                 }}
               />
             </label>
 
-            <label style={{ display: 'block', marginBottom: 18 }}>
-              <span style={{ fontSize: 11, color: '#5a4a3a', display: 'block', marginBottom: 6 }}>笔记（可选）</span>
-              <textarea
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                placeholder="记录你的感受、想法或解读…"
-                rows={4}
-                style={{
-                  width: '100%', padding: '12px 14px',
-                  background: '#fff',
-                  border: '1px solid rgba(196,146,74,0.25)',
-                  borderRadius: 12, color: '#2d2618',
-                  fontSize: 13, lineHeight: 1.7, resize: 'none',
-                }}
-              />
-            </label>
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 18, paddingBottom: 2 }}>
+              {cards.map((c, i) => (
+                <div key={i} style={{ flexShrink: 0, textAlign: 'center' }}>
+                  <div style={{ width: 46, height: 72, borderRadius: 6, overflow: 'hidden', marginBottom: 3 }}>
+                    <CardFace card={c.card} reversed={c.reversed} />
+                  </div>
+                  <p style={{ fontSize: 9, color: '#8a7a5e', width: 46, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.card.nameCN}
+                  </p>
+                </div>
+              ))}
+            </div>
 
             <button onClick={handleSave} className="btn-primary" style={{ width: '100%', marginBottom: 8 }}>
-              ✦ 保存到日志
+              ✦ 保存日志
+            </button>
+            <button
+              onClick={handleDeepen}
+              style={{
+                width: '100%', padding: '12px 0',
+                background: 'linear-gradient(135deg, #2d4a3e, #1f3329)',
+                border: 'none', borderRadius: 12,
+                color: '#fdf9f0', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                marginBottom: 8,
+              }}
+            >
+              ✦ 保存并继续深度占卜
             </button>
             <button onClick={dismiss} style={{
               width: '100%', background: 'none', border: 'none',
@@ -413,6 +429,16 @@ export default function Tarot() {
     setTimeout(() => setSavedToast(false), 2000)
   }
 
+  function handleDeepen() {
+    setSavedToast(true)
+    setTimeout(() => setSavedToast(false), 2000)
+    setPhase('select')
+    setSpread(null)
+    setDrawn([])
+    setFlipped([])
+    setActiveTab('draw')
+  }
+
   return (
     <div className="animate-fade-in pb-nav" style={{ padding: '40px 18px 0', maxWidth: 520, margin: '0 auto' }}>
       <div style={{ paddingTop: 16, marginBottom: 20, textAlign: 'center' }}>
@@ -423,7 +449,7 @@ export default function Tarot() {
           borderRadius: 12, padding: 3, gap: 2,
         }}>
           {[['draw','占卜'], ['history','历史记录']].map(([id, label]) => (
-            <button key={id} onClick={() => { tap(); setActiveTab(id); if (id === 'draw') setPhase('select') }}
+            <button key={id} onClick={() => { tap(); setActiveTab(id); setPhase('select') }}
               style={{
                 padding: '8px 18px', borderRadius: 10, border: 'none',
                 background: activeTab === id ? '#fff' : 'transparent',
@@ -672,8 +698,8 @@ export default function Tarot() {
                 >
                   <span style={{ fontSize: 18 }}>✨</span>
                   <div style={{ flex: 1, textAlign: 'left' }}>
-                    <p style={{ fontSize: 13, color: '#2d2618', fontWeight: 500 }}>AI 深度解读</p>
-                    <p style={{ fontSize: 11, color: '#8a7a5e' }}>会员专属 · DeepSeek 个性化综合解析</p>
+                    <p style={{ fontSize: 13, color: '#2d2618', fontWeight: 500 }}>AI 智能解读</p>
+                    <p style={{ fontSize: 11, color: '#8a7a5e' }}>会员专属 · 个性化综合解析</p>
                   </div>
                   <span style={{
                     fontSize: 9, padding: '3px 8px', borderRadius: 999,
@@ -704,6 +730,7 @@ export default function Tarot() {
           spread={spread} cards={drawn}
           onClose={() => setShowSave(false)}
           onSaved={handleSaved}
+          onDeepen={handleDeepen}
         />
       )}
       {showPremium && (

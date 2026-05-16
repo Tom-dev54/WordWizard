@@ -2,7 +2,6 @@ const NAV_ITEMS = [
   { id: 'home',      label: '每日', icon: HomeIcon },
   { id: 'tarot',     label: '占卜', icon: TarotIcon },
   { id: 'astrology', label: '星盘', icon: AstroIcon },
-  { id: 'library',   label: '词典', icon: BookIcon },
   { id: 'community', label: '社区', icon: PeopleIcon },
 ]
 
@@ -29,14 +28,6 @@ function AstroIcon({ active }) {
       <circle cx="12" cy="12" r="3" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill={active ? '#2d4a3e' : 'none'} />
       <line x1="3" y1="12" x2="21" y2="12" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1" opacity="0.5" />
       <line x1="12" y1="3" x2="12" y2="21" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1" opacity="0.5" />
-    </svg>
-  )
-}
-function BookIcon({ active }) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <path d="M 4 5 L 4 19 Q 4 20, 5 20 L 11 20 L 11 6 Q 7 4, 4 5 Z" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill={active ? 'rgba(45,74,62,0.15)' : 'none'} strokeLinejoin="round" />
-      <path d="M 20 5 L 20 19 Q 20 20, 19 20 L 13 20 L 13 6 Q 17 4, 20 5 Z" stroke={active ? '#2d4a3e' : '#8a7a5e'} strokeWidth="1.4" fill={active ? 'rgba(45,74,62,0.15)' : 'none'} strokeLinejoin="round" />
     </svg>
   )
 }

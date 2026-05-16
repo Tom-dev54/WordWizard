@@ -85,6 +85,10 @@ input, textarea { font-family: inherit; -webkit-appearance: none; appearance: no
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 @keyframes drift {
   from { transform: translateY(100vh) translateX(0) rotate(0deg); }
   to { transform: translateY(-20vh) translateX(40px) rotate(360deg); }

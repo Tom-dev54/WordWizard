@@ -3,11 +3,13 @@ import { useState, useEffect, useRef } from 'react'
 export default function Sheet({ onClose, children, contentStyle }) {
   const [closing, setClosing] = useState(false)
   const closingRef = useRef(false)
+  const readyRef = useRef(false)
 
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
+    const t = setTimeout(() => { readyRef.current = true }, 120)
+    return () => { document.body.style.overflow = prev; clearTimeout(t) }
   }, [])
 
   function dismiss() {
@@ -17,10 +19,15 @@ export default function Sheet({ onClose, children, contentStyle }) {
     setTimeout(onClose, 380)
   }
 
+  function handleBackdrop() {
+    if (!readyRef.current) return
+    dismiss()
+  }
+
   return (
     <div
       className={`sheet${closing ? ' sheet-out' : ''}`}
-      onClick={dismiss}
+      onClick={handleBackdrop}
     >
       <div
         className="sheet-content"

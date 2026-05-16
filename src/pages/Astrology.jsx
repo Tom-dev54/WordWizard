@@ -895,6 +895,7 @@ export default function Astrology() {
   const [year, setYear] = useState('')
   const [hour, setHour] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [browsing, setBrowsing] = useState(null)
 
   // Pre-fill from saved birth data
@@ -928,14 +929,18 @@ export default function Astrology() {
   function handleSubmit(e) {
     e?.preventDefault()
     if (!month || !day) return
-    setSubmitted(true)
-    setBrowsing(null)
+    setSubmitting(true)
     saveUserBirth({
       month: parseInt(month),
       day: parseInt(day),
       year: year ? parseInt(year) : null,
       hour: hour !== '' ? parseInt(hour) : null,
     })
+    setTimeout(() => {
+      setSubmitted(true)
+      setBrowsing(null)
+      setSubmitting(false)
+    }, 600)
   }
 
   const [showPremium, setShowPremium] = useState(false)
@@ -980,8 +985,22 @@ export default function Astrology() {
               </div>
             ))}
           </div>
-          <button type="submit" className="btn-primary" style={{ width: '100%', padding: '11px 0' }}>
-            ✦ 解析命盘
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={submitting}
+            style={{
+              width: '100%', padding: '11px 0',
+              opacity: submitting ? 0.8 : 1,
+              transition: 'opacity 0.2s ease',
+            }}
+          >
+            {submitting ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>✦</span>
+                解析中…
+              </span>
+            ) : '✦ 解析命盘'}
           </button>
         </form>
         {submitted && sunSign && (

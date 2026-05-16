@@ -48,6 +48,11 @@ function useDailySeed() {
   return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate()
 }
 
+export function getDailyIntention() {
+  const seed = new Date().getFullYear() * 10000 + (new Date().getMonth() + 1) * 100 + new Date().getDate()
+  return DAILY_INTENTIONS[seed % DAILY_INTENTIONS.length]
+}
+
 function useDailyCard() {
   const seed = useDailySeed()
   const idx = seed % MAJOR_ARCANA.length
@@ -307,7 +312,7 @@ function QuickActions({ onNavigate }) {
   const actions = [
     { icon: '🃏', label: '抽塔罗', sub: '获得指引', page: 'tarot' },
     { icon: '🌟', label: '查星盘', sub: '解读星象', page: 'astrology' },
-    { icon: '📖', label: '词典', sub: '学习含义', page: 'library' },
+    { icon: '🔮', label: '配对', sub: '星座缘分', page: 'astrology' },
     { icon: '💬', label: '社区', sub: '交流分享', page: 'community' },
   ]
   return (

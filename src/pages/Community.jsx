@@ -4,8 +4,9 @@ import {
   getPosts, addPost, toggleLike, deletePost,
   getComments, addComment,
   getUser, updateUser, AVATARS, relTime,
-  getSavedPosts, toggleSavePost,
+  getSavedPosts, toggleSavePost, getUserBirth, getStreak,
 } from '../utils/storage'
+import { isPremium } from '../utils/premium'
 import Sheet from '../components/Sheet'
 import { tap } from '../utils/haptics'
 
@@ -320,10 +321,13 @@ function NewPostSheet({ onClose }) {
   )
 }
 
-function ProfileSheet({ onClose }) {
+function SettingsSheet({ onClose }) {
   const [user] = useState(getUser())
   const [name, setName] = useState(user.name)
   const [avatar, setAvatar] = useState(user.avatar)
+  const birth = getUserBirth()
+  const streak = getStreak()
+  const premium = isPremium()
 
   return (
     <Sheet onClose={onClose}>
@@ -337,7 +341,7 @@ function ProfileSheet({ onClose }) {
           <>
             <div className="sheet-handle" />
             <h3 className="serif" style={{ fontSize: 20, color: '#2d2618', marginBottom: 18, textAlign: 'center' }}>
-              个人资料
+              个人设置
             </h3>
 
             <div style={{ marginBottom: 18 }}>
@@ -346,7 +350,7 @@ function ProfileSheet({ onClose }) {
                 {AVATARS.map(a => (
                   <button
                     key={a}
-                    onClick={() => setAvatar(a)}
+                    onClick={() => { tap(); setAvatar(a) }}
                     style={{
                       aspectRatio: '1',
                       background: avatar === a ? '#2d4a3e' : '#fdf9f0',
@@ -373,6 +377,58 @@ function ProfileSheet({ onClose }) {
                 }}
               />
             </label>
+
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 11, color: '#5a4a3a', marginBottom: 10 }}>个人信息</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {birth ? (
+                  <div style={{
+                    background: 'rgba(196,146,74,0.08)', borderRadius: 10,
+                    padding: '10px 14px', fontSize: 12, color: '#5a4a3a',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    🎂 {birth.month}月{birth.day}日{birth.year ? ` ${birth.year}年` : ''}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#8a7a5e' }}>前往「星盘」页面输入出生信息</div>
+                )}
+                {streak > 0 && (
+                  <div style={{
+                    background: 'rgba(196,146,74,0.08)', borderRadius: 10,
+                    padding: '10px 14px', fontSize: 12, color: '#c4924a',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    🔥 连续签到 {streak} 天
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{
+              marginBottom: 18, background: premium
+                ? 'linear-gradient(135deg, rgba(196,146,74,0.12), rgba(196,146,74,0.05))'
+                : '#fdf9f0',
+              borderRadius: 12, padding: '14px 16px',
+              border: `1px solid ${premium ? 'rgba(196,146,74,0.35)' : 'rgba(196,146,74,0.15)'}`,
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <div style={{ fontSize: 22 }}>{premium ? '✦' : '🔒'}</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 13, color: '#2d2618', fontWeight: 600, marginBottom: 2 }}>
+                  {premium ? '月相塔罗会员' : '免费版'}
+                </p>
+                <p style={{ fontSize: 11, color: '#8a7a5e' }}>
+                  {premium ? '全部专属功能已解锁' : '升级会员，解锁AI解读、高级牌阵等'}
+                </p>
+              </div>
+              {!premium && (
+                <div style={{
+                  padding: '5px 12px', borderRadius: 999, fontSize: 11,
+                  background: 'linear-gradient(135deg, #c9973a, #e8c06a)',
+                  color: '#fff', fontWeight: 600, whiteSpace: 'nowrap',
+                }}>升级</div>
+              )}
+            </div>
 
             <button onClick={handleSave} className="btn-primary" style={{ width: '100%' }}>
               ✦ 保存
@@ -542,7 +598,7 @@ export default function Community() {
         <NewPostSheet onClose={() => { setShowNew(false); refresh() }} />
       )}
       {showProfile && (
-        <ProfileSheet onClose={() => { setShowProfile(false); refresh() }} />
+        <SettingsSheet onClose={() => { setShowProfile(false); refresh() }} />
       )}
     </div>
   )
