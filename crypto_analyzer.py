@@ -2,31 +2,28 @@ import os
 import time
 import warnings
 from datetime import datetime
-
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import matplotlib.patches as mpatches
-from matplotlib.patches import Rectangle
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
 import requests
 import gradio as gr
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-# ──────────────────────────────────────────────────────────────────────────────
-# DeepSeek AI 接入方式说明：
-#   DeepSeek 兼容 OpenAI SDK，只需改 base_url 即可，不需要任何 SparkAI 包。
-#   在 Replit 中：左侧 Secrets 添加 DEEPSEEK_API_KEY，程序自动读取。
-# ──────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+# DeepSeek AI via OpenAI-compatible SDK (NOT SparkAI)
+# In Replit: Secrets panel → DEEPSEEK_API_KEY
+# ────────────────────────────────────────────────────────────────────────────
 from openai import OpenAI
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
-# ─── DeepSeek AI ──────────────────────────────────────────────────────────────
 _DEEPSEEK_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-_ai_client = OpenAI(api_key=_DEEPSEEK_KEY, base_url="https://api.deepseek.com") if _DEEPSEEK_KEY else None
+_ai_client = (
+    OpenAI(api_key=_DEEPSEEK_KEY, base_url="https://api.deepseek.com")
+    if _DEEPSEEK_KEY else None
+)
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 BINANCE_SPOT    = "https://api.binance.com/api/v3"
@@ -34,17 +31,18 @@ BINANCE_FUTURES = "https://fapi.binance.com/fapi/v1"
 BINANCE_FDATA   = "https://fapi.binance.com/futures/data"
 FNG_URL         = "https://api.alternative.me/fng/"
 
-KLINE_LIMIT   = 200
+KLINE_LIMIT     = 200
 REQUEST_TIMEOUT = 8
-CACHE_TTL     = 30   # seconds
+CACHE_TTL       = 30
 
 STOP_LOSS_PCT   = 0.02
 TAKE_PROFIT_PCT = 0.05
 
 POPULAR_PAIRS = [
-    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-    "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT",
-    "MATICUSDT", "LTCUSDT", "UNIUSDT", "ATOMUSDT", "NEARUSDT",
+    "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT",
+    "DOGEUSDT","ADAUSDT","AVAXUSDT","DOTUSDT","LINKUSDT",
+    "MATICUSDT","LTCUSDT","UNIUSDT","ATOMUSDT","NEARUSDT",
+    "AAVEUSDT","SHIBUSDT","ALGOUSDT","FILUSDT","APTUSDT",
 ]
 
 TIMEFRAME_MAP = {
@@ -54,8 +52,8 @@ TIMEFRAME_MAP = {
     "日线":   "1d",
 }
 
-# ─── Simple cache ─────────────────────────────────────────────────────────────
 _cache: dict = {}
+
 
 def _cached(key, fn, ttl=CACHE_TTL):
     now = time.time()
@@ -66,9 +64,10 @@ def _cached(key, fn, ttl=CACHE_TTL):
         _cache[key] = (result, now)
     return result
 
+
 # ─── Data Fetching ────────────────────────────────────────────────────────────
 
-def _get(url: str, params: dict = None):
+def _get(url, params=None):
     try:
         r = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
         r.raise_for_status()
@@ -77,39 +76,42 @@ def _get(url: str, params: dict = None):
         return None
 
 
-def fetch_klines(symbol: str, interval: str) -> pd.DataFrame | None:
+def fetch_klines(symbol, interval):
     key = f"klines_{symbol}_{interval}"
+
     def _fetch():
-        data = _get(f"{BINANCE_SPOT}/klines", {
-            "symbol": symbol, "interval": interval, "limit": KLINE_LIMIT
-        })
+        data = _get(
+            f"{BINANCE_SPOT}/klines",
+            {"symbol": symbol, "interval": interval, "limit": KLINE_LIMIT},
+        )
         if not data:
             return None
         df = pd.DataFrame(data, columns=[
             "open_time","open","high","low","close","volume",
-            "close_time","qvolume","trades","taker_buy_base","taker_buy_quote","ignore"
+            "close_time","qvolume","trades","taker_buy_base","taker_buy_quote","ignore",
         ])
         for c in ["open","high","low","close","volume","qvolume"]:
             df[c] = pd.to_numeric(df[c], errors="coerce")
         df["datetime"] = pd.to_datetime(df["open_time"], unit="ms")
         return df[["datetime","open","high","low","close","volume","qvolume"]].reset_index(drop=True)
+
     return _cached(key, _fetch)
 
 
-def fetch_ticker_24h(symbol: str) -> dict | None:
+def fetch_ticker_24h(symbol):
     key = f"ticker_{symbol}"
     def _fetch():
         return _get(f"{BINANCE_SPOT}/ticker/24hr", {"symbol": symbol})
     return _cached(key, _fetch, ttl=15)
 
 
-def fetch_all_tickers() -> list | None:
+def fetch_all_tickers():
     def _fetch():
         return _get(f"{BINANCE_SPOT}/ticker/24hr")
     return _cached("all_tickers", _fetch, ttl=30)
 
 
-def fetch_funding_rate(symbol: str) -> float | None:
+def fetch_funding_rate(symbol):
     key = f"funding_{symbol}"
     def _fetch():
         data = _get(f"{BINANCE_FUTURES}/fundingRate", {"symbol": symbol, "limit": 1})
@@ -119,29 +121,20 @@ def fetch_funding_rate(symbol: str) -> float | None:
     return _cached(key, _fetch, ttl=60)
 
 
-def fetch_long_short_ratio(symbol: str) -> float | None:
+def fetch_long_short_ratio(symbol):
     key = f"lsr_{symbol}"
     def _fetch():
-        data = _get(f"{BINANCE_FDATA}/globalLongShortAccountRatio", {
-            "symbol": symbol, "period": "1h", "limit": 1
-        })
+        data = _get(
+            f"{BINANCE_FDATA}/globalLongShortAccountRatio",
+            {"symbol": symbol, "period": "1h", "limit": 1},
+        )
         if data and len(data) > 0:
             return float(data[0].get("longShortRatio", 1.0))
         return None
     return _cached(key, _fetch, ttl=60)
 
 
-def fetch_open_interest(symbol: str) -> dict | None:
-    key = f"oi_{symbol}"
-    def _fetch():
-        data = _get(f"{BINANCE_FUTURES}/openInterest", {"symbol": symbol})
-        if data:
-            return {"value": float(data.get("openInterest", 0))}
-        return None
-    return _cached(key, _fetch, ttl=60)
-
-
-def fetch_fear_greed() -> dict | None:
+def fetch_fear_greed():
     def _fetch():
         data = _get(FNG_URL, {"limit": 1})
         if data and "data" in data and len(data["data"]) > 0:
@@ -150,9 +143,10 @@ def fetch_fear_greed() -> dict | None:
         return None
     return _cached("fng", _fetch, ttl=300)
 
+
 # ─── Technical Indicators ─────────────────────────────────────────────────────
 
-def calc_rsi(close: pd.Series, period: int = 14) -> pd.Series:
+def calc_rsi(close, period=14):
     delta = close.diff()
     gain  = delta.clip(lower=0)
     loss  = (-delta).clip(lower=0)
@@ -162,37 +156,36 @@ def calc_rsi(close: pd.Series, period: int = 14) -> pd.Series:
     return 100 - (100 / (1 + rs))
 
 
-def calc_macd(close: pd.Series, fast=12, slow=26, signal=9):
-    ema_f   = close.ewm(span=fast,   adjust=False).mean()
-    ema_s   = close.ewm(span=slow,   adjust=False).mean()
-    macd    = ema_f - ema_s
-    sig_line= macd.ewm(span=signal,  adjust=False).mean()
-    hist    = macd - sig_line
-    return macd, sig_line, hist
+def calc_macd(close, fast=12, slow=26, signal=9):
+    ema_f    = close.ewm(span=fast,   adjust=False).mean()
+    ema_s    = close.ewm(span=slow,   adjust=False).mean()
+    macd     = ema_f - ema_s
+    sig_line = macd.ewm(span=signal,  adjust=False).mean()
+    return macd, sig_line, macd - sig_line
 
 
-def calc_bb(close: pd.Series, period=20, std_dev=2.0):
-    mid   = close.rolling(period).mean()
-    std   = close.rolling(period).std(ddof=0)
+def calc_bb(close, period=20, std_dev=2.0):
+    mid = close.rolling(period).mean()
+    std = close.rolling(period).std(ddof=0)
     return mid + std_dev * std, mid, mid - std_dev * std
 
 
-def calc_atr(df: pd.DataFrame, period=14) -> pd.Series:
+def calc_atr(df, period=14):
     hi, lo, cl = df["high"], df["low"], df["close"]
     prev_cl = cl.shift(1)
     tr = pd.concat([
-        hi - lo,
+        (hi - lo),
         (hi - prev_cl).abs(),
-        (lo - prev_cl).abs()
+        (lo - prev_cl).abs(),
     ], axis=1).max(axis=1)
     return tr.rolling(period).mean()
 
 
-def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
+def add_indicators(df):
     df = df.copy()
     close = df["close"]
-    df["rsi"]                          = calc_rsi(close)
-    df["macd"], df["macd_sig"], df["macd_hist"] = calc_macd(close)
+    df["rsi"]                                    = calc_rsi(close)
+    df["macd"], df["macd_sig"], df["macd_hist"]  = calc_macd(close)
     df["bb_upper"], df["bb_mid"], df["bb_lower"] = calc_bb(close)
     df["ema20"]    = close.ewm(span=20, adjust=False).mean()
     df["ema50"]    = close.ewm(span=50, adjust=False).mean()
@@ -200,110 +193,101 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["vol_ma10"] = df["volume"].rolling(10).mean()
     return df
 
+
 # ─── Signal Generation ────────────────────────────────────────────────────────
 
-def generate_signal(df: pd.DataFrame) -> dict:
+def _empty_sig():
+    return {
+        "signal": "数据不足", "color": "#888", "direction": "观望",
+        "win_rate": "N/A", "confidence": 0, "bull_score": 0, "bear_score": 0,
+        "rsi": 50, "macd_hist": 0, "atr_pct": 0, "ema20": 0, "ema50": 0,
+        "bb_upper": 0, "bb_lower": 0, "bb_mid": 0, "price": 0,
+        "entry": 0, "stop_loss": 0, "take_profit": 0,
+        "order_type": "观望", "limit_price": None, "is_long": False,
+    }
+
+
+def generate_signal(df):
     clean = df.dropna(subset=["rsi","macd","bb_upper","ema20","ema50","atr"])
     if len(clean) < 2:
-        return {"signal": "数据不足", "color": "#888888", "direction": "观望",
-                "win_rate": "N/A", "confidence": 0}
+        return _empty_sig()
 
-    r = clean.iloc[-1]
-    prev = clean.iloc[-2]
-
-    rsi         = r["rsi"]
-    price       = r["close"]
-    macd_hist   = r["macd_hist"]
-    prev_hist   = prev["macd_hist"]
-    bb_upper    = r["bb_upper"]
-    bb_lower    = r["bb_lower"]
-    bb_mid      = r["bb_mid"]
-    ema20       = r["ema20"]
-    ema50       = r["ema50"]
-    atr         = r["atr"]
-    atr_pct     = atr / price * 100
+    r, prev   = clean.iloc[-1], clean.iloc[-2]
+    rsi       = r["rsi"]
+    price     = r["close"]
+    macd_hist = r["macd_hist"]
+    prev_hist = prev["macd_hist"]
+    bb_upper  = r["bb_upper"]
+    bb_lower  = r["bb_lower"]
+    bb_mid    = r["bb_mid"]
+    ema20     = r["ema20"]
+    ema50     = r["ema50"]
+    atr_pct   = r["atr"] / price * 100
 
     macd_cross_up   = macd_hist > 0 and prev_hist <= 0
     macd_cross_down = macd_hist < 0 and prev_hist >= 0
-    macd_bull       = macd_hist > 0
-    macd_bear       = macd_hist < 0
-    ema_bull        = ema20 > ema50
-    ema_bear        = ema20 < ema50
-    near_lower_bb   = price <= bb_lower * 1.01
-    near_upper_bb   = price >= bb_upper * 0.99
 
-    bull_score = 0
-    bear_score = 0
+    bull, bear = 0, 0
 
-    if rsi < 30:            bull_score += 3
-    elif rsi < 40:          bull_score += 2
-    elif rsi < 50:          bull_score += 1
-    if rsi > 70:            bear_score += 3
-    elif rsi > 60:          bear_score += 2
-    elif rsi > 50:          bear_score += 1
+    if rsi < 30:   bull += 3
+    elif rsi < 40: bull += 2
+    elif rsi < 50: bull += 1
+    if rsi > 70:   bear += 3
+    elif rsi > 60: bear += 2
+    elif rsi > 50: bear += 1
 
-    if macd_cross_up:       bull_score += 3
-    elif macd_bull:         bull_score += 1
-    if macd_cross_down:     bear_score += 3
-    elif macd_bear:         bear_score += 1
+    if macd_cross_up:   bull += 3
+    elif macd_hist > 0: bull += 1
+    if macd_cross_down: bear += 3
+    elif macd_hist < 0: bear += 1
 
-    if ema_bull:            bull_score += 2
-    if ema_bear:            bear_score += 2
+    if ema20 > ema50:             bull += 2
+    if ema20 < ema50:             bear += 2
+    if price <= bb_lower * 1.01:  bull += 2
+    if price >= bb_upper * 0.99:  bear += 2
 
-    if near_lower_bb:       bull_score += 2
-    if near_upper_bb:       bear_score += 2
-
-    net = bull_score - bear_score
+    net = bull - bear
 
     if net >= 6:
-        signal, color = "强烈买入 🚀", "#00c851"
-        direction = "开多 📈"
-        win_rate  = "约 70%"
+        signal, color = "强烈买入 🚀", "#00d4aa"
+        direction, win_rate = "开多 📈", "约 70%"
         confidence = min(95, 60 + net * 3)
     elif net >= 3:
-        signal, color = "买入 📈", "#33b679"
-        direction = "开多 📈"
-        win_rate  = "约 60%"
+        signal, color = "买入 📈", "#00d4aa"
+        direction, win_rate = "开多 📈", "约 60%"
         confidence = min(80, 50 + net * 3)
     elif net <= -6:
-        signal, color = "强烈卖出 ⚠️", "#cc0000"
-        direction = "开空 📉"
-        win_rate  = "约 70%"
+        signal, color = "强烈卖出 🔻", "#ff4757"
+        direction, win_rate = "开空 📉", "约 70%"
         confidence = min(95, 60 + abs(net) * 3)
     elif net <= -3:
-        signal, color = "卖出 📉", "#ff4444"
-        direction = "开空 📉"
-        win_rate  = "约 60%"
+        signal, color = "卖出 📉", "#ff4757"
+        direction, win_rate = "开空 📉", "约 60%"
         confidence = min(80, 50 + abs(net) * 3)
     else:
-        signal, color = "观望 ⏸", "#ffab00"
-        direction = "观望"
-        win_rate  = "< 50%"
+        signal, color = "观望 ⏸", "#ffa502"
+        direction, win_rate = "观望", "< 50%"
         confidence = 30
 
-    is_long    = "多" in direction
-    entry      = price
-    stop_loss  = entry * (1 - STOP_LOSS_PCT) if is_long else entry * (1 + STOP_LOSS_PCT)
-    take_profit= entry * (1 + TAKE_PROFIT_PCT) if is_long else entry * (1 - TAKE_PROFIT_PCT)
-
+    is_long     = "多" in direction
+    entry       = price
+    stop_loss   = entry * (1 - STOP_LOSS_PCT)   if is_long else entry * (1 + STOP_LOSS_PCT)
+    take_profit = entry * (1 + TAKE_PROFIT_PCT)  if is_long else entry * (1 - TAKE_PROFIT_PCT)
     order_type, limit_price = _order_type(price, bb_lower, bb_mid, ema20, is_long, net)
 
     return {
         "signal": signal, "color": color,
-        "direction": direction, "win_rate": win_rate,
-        "confidence": confidence,
-        "price": price, "rsi": rsi,
-        "macd_hist": macd_hist, "atr_pct": atr_pct,
+        "direction": direction, "win_rate": win_rate, "confidence": confidence,
+        "price": price, "rsi": rsi, "macd_hist": macd_hist, "atr_pct": atr_pct,
         "ema20": ema20, "ema50": ema50,
         "bb_upper": bb_upper, "bb_lower": bb_lower, "bb_mid": bb_mid,
         "entry": entry, "stop_loss": stop_loss, "take_profit": take_profit,
         "order_type": order_type, "limit_price": limit_price,
-        "bull_score": bull_score, "bear_score": bear_score,
-        "is_long": is_long,
+        "bull_score": bull, "bear_score": bear, "is_long": is_long,
     }
 
 
-def _order_type(price, bb_lower, bb_mid, ema20, is_long: bool, net: int):
+def _order_type(price, bb_lower, bb_mid, ema20, is_long, net):
     if abs(net) >= 6:
         return "市价单（立即成交）", None
     if is_long:
@@ -318,86 +302,68 @@ def _order_type(price, bb_lower, bb_mid, ema20, is_long: bool, net: int):
         return "市价单（价格合适）", None
 
 
-def calc_position(capital_u: float, sig: dict, leverage: int) -> dict:
-    risk_u       = capital_u * STOP_LOSS_PCT
-    sl_pct       = STOP_LOSS_PCT
-    open_u       = min(capital_u * 0.3, risk_u / sl_pct)
-    open_u       = round(open_u, 1)
-    nominal_u    = open_u * leverage
-    profit_u     = round(open_u * TAKE_PROFIT_PCT * leverage, 2)
-    loss_u       = round(open_u * STOP_LOSS_PCT   * leverage, 2)
-    return {
-        "open_u": open_u, "leverage": leverage,
-        "nominal_u": nominal_u,
-        "profit_u": profit_u, "loss_u": loss_u,
-    }
+def calc_position(capital_u, sig, leverage):
+    open_u    = round(min(capital_u * 0.3, capital_u * STOP_LOSS_PCT / STOP_LOSS_PCT), 1)
+    open_u    = round(capital_u * 0.3, 1)
+    nominal_u = open_u * leverage
+    profit_u  = round(open_u * TAKE_PROFIT_PCT * leverage, 2)
+    loss_u    = round(open_u * STOP_LOSS_PCT   * leverage, 2)
+    return {"open_u": open_u, "leverage": leverage,
+            "nominal_u": nominal_u, "profit_u": profit_u, "loss_u": loss_u}
 
 
-def recommend_leverage(sig: dict) -> int:
+def recommend_leverage(sig):
     atr_pct = sig.get("atr_pct", 2.0)
     net     = sig.get("bull_score", 0) - sig.get("bear_score", 0)
-    if "观望" in sig["signal"]:
-        return 1
-    if atr_pct > 3:
-        return 2
-    if abs(net) >= 6:
-        return min(5, int(4 + (abs(net) - 6) * 0.5))
-    if abs(net) >= 3:
-        return 3
+    if "观望" in sig["signal"]: return 1
+    if atr_pct > 3:             return 2
+    if abs(net) >= 6:           return min(5, int(4 + (abs(net) - 6) * 0.5))
+    if abs(net) >= 3:           return 3
     return 2
+
 
 # ─── Market Sentiment ─────────────────────────────────────────────────────────
 
-def fetch_sentiment(symbol: str) -> dict:
-    fng  = fetch_fear_greed() or {"value": 50, "label": "Neutral"}
-    fr   = fetch_funding_rate(symbol)
-    lsr  = fetch_long_short_ratio(symbol)
+def fetch_sentiment(symbol):
+    fg  = fetch_fear_greed()
+    fr  = fetch_funding_rate(symbol)
+    lsr = fetch_long_short_ratio(symbol)
 
-    fg_val = fng["value"]
-    fg_label_map = {
-        range(0,  25): "极度恐惧 😱",
-        range(25, 47): "恐惧 😰",
-        range(47, 54): "中性 😐",
-        range(54, 75): "贪婪 😏",
-        range(75, 101):"极度贪婪 🤑",
-    }
-    fg_label = "未知"
-    for r, lbl in fg_label_map.items():
-        if fg_val in r:
-            fg_label = lbl
-            break
+    fg_val   = fg["value"] if fg else 50
+    fg_label = fg["label"] if fg else "中性"
+    sent_bull, sent_bear = 0, 0
 
-    sent_score = fg_val
-    sent_bull  = 0
-    sent_bear  = 0
+    if fg_val < 25:
+        sent_bull += 2
+    elif fg_val < 45:
+        sent_bull += 1
+    elif fg_val > 75:
+        sent_bear += 2
+    elif fg_val > 55:
+        sent_bear += 1
 
-    if fg_val < 25:   sent_bull += 2
-    elif fg_val < 40: sent_bull += 1
-    if fg_val > 75:   sent_bear += 2
-    elif fg_val > 60: sent_bear += 1
-
-    fr_label = "N/A"
     if fr is not None:
-        fr_pct = fr * 100
-        if fr_pct > 0.1:
-            fr_label = f"+{fr_pct:.4f}%（多头过热，注意轧空风险）"
+        if fr > 0.001:
+            fr_label = f"{fr*100:.4f}%（多头付费）"
             sent_bear += 1
-        elif fr_pct < -0.05:
-            fr_label = f"{fr_pct:.4f}%（空头过热，做多有优势）"
+        elif fr < -0.0005:
+            fr_label = f"{fr*100:.4f}%（空头付费）"
             sent_bull += 1
         else:
-            fr_label = f"{fr_pct:.4f}%（中性）"
+            fr_label = f"{fr*100:.4f}%（中性）"
+    else:
+        fr_label = "获取失败"
 
-    lsr_label = "N/A"
     if lsr is not None:
         if lsr > 1.2:
             lsr_label = f"{lsr:.2f}（多头占优）"
-            sent_bull += 1
         elif lsr < 0.8:
             lsr_label = f"{lsr:.2f}（空头占优）"
             sent_bear += 1
         else:
             lsr_label = f"{lsr:.2f}（多空均衡）"
+    else:
+        lsr_label = "获取失败"
 
     net_sent = sent_bull - sent_bear
     if net_sent >= 2:    sent_overall = "偏多 📈"
@@ -411,26 +377,27 @@ def fetch_sentiment(symbol: str) -> dict:
         "bull": sent_bull, "bear": sent_bear,
     }
 
+
 # ─── AI Analysis ──────────────────────────────────────────────────────────────
 
-def ai_analyze(symbol: str, sig: dict, sentiment: dict, capital_u: float, strategy: str) -> str:
+def ai_analyze(symbol, sig, sentiment, capital_u, strategy):
     if _ai_client is None:
-        return "（AI 分析未启用：未配置 DEEPSEEK_API_KEY）"
+        return "（未配置 DEEPSEEK_API_KEY，AI 分析已跳过）"
 
-    rsi_status = "超卖" if sig["rsi"] < 30 else ("超买" if sig["rsi"] > 70 else "中性")
-    macd_status= "多头金叉" if sig["macd_hist"] > 0 else "空头死叉"
-    ema_status = "多头排列" if sig["ema20"] > sig["ema50"] else "空头排列"
+    rsi_s  = "超卖" if sig["rsi"] < 30 else ("超买" if sig["rsi"] > 70 else "中性")
+    macd_s = "多头金叉" if sig["macd_hist"] > 0 else "空头死叉"
+    ema_s  = "多头排列" if sig["ema20"] > sig["ema50"] else "空头排列"
 
     prompt = f"""你是专业加密货币量化交易分析师，请根据以下实时数据用中文给出综合交易建议：
 
 【币种】{symbol}  【当前价格】${sig['price']:,.4f}
-【策略类型】{strategy}  【本金】{capital_u} USDT
+【策略】{strategy}  【本金】{capital_u} USDT
 
 【技术指标】
-- RSI(14): {sig['rsi']:.1f}（{rsi_status}）
-- MACD柱状图: {sig['macd_hist']:+.6f}（{macd_status}）
-- EMA20/EMA50: {ema_status}
-- 布林带位置: 上轨${sig['bb_upper']:,.2f} / 下轨${sig['bb_lower']:,.2f}
+- RSI(14): {sig['rsi']:.1f}（{rsi_s}）
+- MACD柱状图: {sig['macd_hist']:+.6f}（{macd_s}）
+- EMA20/EMA50: {ema_s}
+- 布林带: 上轨${sig['bb_upper']:,.2f} / 下轨${sig['bb_lower']:,.2f}
 - ATR波动率: {sig['atr_pct']:.2f}%
 
 【市场情绪】
@@ -441,7 +408,7 @@ def ai_analyze(symbol: str, sig: dict, sentiment: dict, capital_u: float, strate
 
 【规则信号】{sig['signal']}，建议{sig['direction']}，胜率{sig['win_rate']}
 
-请给出（不超过200字）：
+请给出（不超过180字）：
 1. 综合判断（开多/开空/观望）和核心理由
 2. 最优入场方式（市价/挂单及价格）
 3. 止损止盈建议
@@ -459,412 +426,659 @@ def ai_analyze(symbol: str, sig: dict, sentiment: dict, capital_u: float, strate
     except Exception as e:
         return f"AI 分析请求失败：{e}"
 
+
 # ─── Market Scanner ───────────────────────────────────────────────────────────
 
-def scan_market(strategy: str = "快进快出") -> dict:
+def scan_market(strategy="快进快出"):
     tickers = fetch_all_tickers()
     if not tickers:
         return {"热门榜": [], "涨幅榜": [], "跌幅榜": [], "快进快出榜": []}
 
-    usdt = [t for t in tickers if t.get("symbol","").endswith("USDT")
+    usdt = [t for t in tickers
+            if t.get("symbol","").endswith("USDT")
             and float(t.get("quoteVolume","0")) > 1_000_000]
 
     def to_row(t):
-        sym    = t["symbol"]
-        price  = float(t["lastPrice"])
-        chg    = float(t["priceChangePercent"])
-        vol    = float(t["quoteVolume"])
-        hi     = float(t["highPrice"])
-        lo     = float(t["lowPrice"])
-        spread = (hi - lo) / ((hi + lo) / 2) * 100 if (hi + lo) > 0 else 0
-        return {"symbol": sym, "price": price, "change": chg, "volume": vol, "spread": spread}
+        hi  = float(t["highPrice"])
+        lo  = float(t["lowPrice"])
+        mid = (hi + lo) / 2 or 1
+        return {
+            "symbol": t["symbol"],
+            "price":  float(t["lastPrice"]),
+            "change": float(t["priceChangePercent"]),
+            "volume": float(t["quoteVolume"]),
+            "spread": (hi - lo) / mid * 100,
+        }
 
-    rows = [to_row(t) for t in usdt]
-
+    rows  = [to_row(t) for t in usdt]
     hot   = sorted(rows, key=lambda x: x["volume"],  reverse=True)[:5]
-    up    = sorted([r for r in rows if r["change"] > 3],
-                   key=lambda x: x["change"], reverse=True)[:5]
-    down  = sorted([r for r in rows if r["change"] < -3],
-                   key=lambda x: x["change"])[:5]
+    up    = sorted([r for r in rows if r["change"] >  3], key=lambda x: x["change"], reverse=True)[:5]
+    down  = sorted([r for r in rows if r["change"] < -3], key=lambda x: x["change"])[:5]
     scalp = sorted(rows, key=lambda x: x["spread"] * x["volume"], reverse=True)[:5]
-
     return {"热门榜": hot, "涨幅榜": up, "跌幅榜": down, "快进快出榜": scalp}
 
 
-def select_best_coin(capital_u: float, strategy: str) -> str:
-    market = scan_market(strategy)
-    if strategy == "快进快出":
-        coins = market["快进快出榜"]
-        reason= "高波动×高成交量，适合快进快出"
-    elif strategy == "趋势交易":
-        coins = market["涨幅榜"]
-        reason= "强势上涨趋势，适合顺势持仓"
-    else:
-        coins = market["热门榜"]
-        reason= "成交量最大，流动性好"
+# ─── Auto Coin Selection ──────────────────────────────────────────────────────
 
-    if not coins:
-        return "暂无推荐（数据获取失败）"
-
-    top = coins[0]
-    note = ""
-    if capital_u < 200 and "BTC" in top["symbol"]:
-        alts = [c for c in coins if "BTC" not in c["symbol"]]
-        if alts:
-            top  = alts[0]
-            note = "（小资金优先山寨币，波动幅度更适合）"
-
-    return f"**推荐：{top['symbol']}**{note}\n涨跌: {top['change']:+.2f}% | 成交量: ${top['volume']/1e6:.1f}M | 理由: {reason}"
-
-# ─── Chart ────────────────────────────────────────────────────────────────────
-
-def build_chart(df: pd.DataFrame, symbol: str) -> plt.Figure | None:
+def _scan_single(sym, interval, tickers_map, strategy, capital_u):
     try:
-        df_plot = df.dropna(subset=["rsi","macd"]).tail(80).copy()
-        df_plot = df_plot.reset_index(drop=True)
-        n = len(df_plot)
-        if n < 5:
+        df = fetch_klines(sym, interval)
+        if df is None or len(df) < 60:
+            return None
+        df  = add_indicators(df)
+        sig = generate_signal(df)
+
+        if "数据不足" in sig["signal"] or "观望" in sig["signal"]:
             return None
 
-        plt.style.use("dark_background")
-        fig = plt.figure(figsize=(12, 9), facecolor="#0d1117")
-        gs  = gridspec.GridSpec(3, 1, height_ratios=[3, 1, 1], hspace=0.08)
-        ax1 = fig.add_subplot(gs[0])
-        ax2 = fig.add_subplot(gs[1], sharex=ax1)
-        ax3 = fig.add_subplot(gs[2], sharex=ax1)
+        net   = sig["bull_score"] - sig["bear_score"]
+        score = sig["confidence"] + abs(net) * 5
 
-        for ax in [ax1, ax2, ax3]:
-            ax.set_facecolor("#0d1117")
-            ax.tick_params(colors="#aaaaaa", labelsize=7)
-            ax.spines["top"].set_visible(False)
-            ax.spines["right"].set_visible(False)
-            for spine in ax.spines.values():
-                spine.set_color("#333333")
+        t       = tickers_map.get(sym, {})
+        vol_24h = float(t.get("quoteVolume", 0))
+        chg_24h = float(t.get("priceChangePercent", 0))
+        hi      = float(t.get("highPrice", sig["price"]))
+        lo      = float(t.get("lowPrice",  sig["price"]))
+        spread  = (hi - lo) / ((hi + lo) / 2 or 1) * 100
 
-        # ── Panel 1: Candlesticks ──
-        for i, row in df_plot.iterrows():
-            is_bull = row["close"] >= row["open"]
-            color   = "#00c851" if is_bull else "#ff4444"
-            bot     = min(row["open"], row["close"])
-            height  = abs(row["close"] - row["open"]) or row["close"] * 0.001
-            ax1.add_patch(Rectangle((i - 0.35, bot), 0.7, height,
-                                     color=color, zorder=3))
-            ax1.vlines(i, row["low"], row["high"], color=color,
-                       linewidth=0.8, zorder=2)
+        if strategy == "快进快出":
+            score += spread * 8
+        elif strategy == "趋势交易" and abs(chg_24h) > 3:
+            score += 15
 
-        xs = df_plot.index.tolist()
-        ax1.plot(xs, df_plot["bb_upper"], "--", color="#4a90d9", lw=0.8, label="BB Upper")
-        ax1.plot(xs, df_plot["bb_mid"],   ":",  color="#888888", lw=0.8, label="BB Mid")
-        ax1.plot(xs, df_plot["bb_lower"], "--", color="#4a90d9", lw=0.8, label="BB Lower")
-        ax1.fill_between(xs, df_plot["bb_upper"], df_plot["bb_lower"],
-                         alpha=0.05, color="#4a90d9")
-        ax1.plot(xs, df_plot["ema20"], color="#f5a623", lw=1.2, label="EMA20")
-        ax1.plot(xs, df_plot["ema50"], color="#bd10e0", lw=1.2, label="EMA50")
+        if capital_u < 200 and sig["price"] > 5000:
+            score -= 20
 
-        ax1.set_ylabel("Price (USDT)", color="#aaaaaa", fontsize=8)
-        ax1.set_title(f"{symbol}  |  Last: ${df_plot['close'].iloc[-1]:,.4f}",
-                      color="white", fontsize=10, pad=8)
-        ax1.legend(loc="upper left", fontsize=6, framealpha=0.3,
-                   labelcolor="white", facecolor="#1a1a2e")
-        ax1.grid(axis="y", color="#1f1f2e", lw=0.5)
+        return {
+            "symbol":     sym,
+            "signal":     sig["signal"],
+            "direction":  sig["direction"],
+            "win_rate":   sig["win_rate"],
+            "confidence": sig["confidence"],
+            "score":      score,
+            "price":      sig["price"],
+            "change":     chg_24h,
+            "vol":        vol_24h,
+            "spread":     spread,
+            "is_long":    sig["is_long"],
+        }
+    except Exception:
+        return None
 
-        # ── Panel 2: Volume ──
-        for i, row in df_plot.iterrows():
-            color = "#00c851" if row["close"] >= row["open"] else "#ff4444"
-            ax2.bar(i, row["volume"], color=color, alpha=0.7, width=0.7)
-        ax2.plot(xs, df_plot["vol_ma10"], color="#f5a623", lw=1.0)
-        ax2.set_ylabel("Volume", color="#aaaaaa", fontsize=7)
-        ax2.grid(axis="y", color="#1f1f2e", lw=0.5)
 
-        # ── Panel 3: RSI ──
-        ax3.plot(xs, df_plot["rsi"], color="#9b59b6", lw=1.2)
-        ax3.axhline(70, color="#ff4444", lw=0.8, ls="--")
-        ax3.axhline(30, color="#00c851", lw=0.8, ls="--")
-        ax3.axhline(50, color="#555555", lw=0.5, ls=":")
-        ax3.fill_between(xs, df_plot["rsi"], 70,
-                         where=df_plot["rsi"] >= 70, alpha=0.2, color="#ff4444")
-        ax3.fill_between(xs, df_plot["rsi"], 30,
-                         where=df_plot["rsi"] <= 30, alpha=0.2, color="#00c851")
-        ax3.set_ylim(0, 100)
-        ax3.set_ylabel("RSI", color="#aaaaaa", fontsize=7)
-        ax3.grid(axis="y", color="#1f1f2e", lw=0.5)
+def auto_select_coin(capital_u=100, strategy="快进快出", interval="1h"):
+    tickers = fetch_all_tickers()
+    if not tickers:
+        return []
 
-        # X-axis labels (show every ~10 candles)
-        step = max(1, n // 8)
-        ticks = list(range(0, n, step))
-        labels = [df_plot["datetime"].iloc[i].strftime("%m/%d %H:%M") for i in ticks]
-        ax3.set_xticks(ticks)
-        ax3.set_xticklabels(labels, rotation=30, ha="right", fontsize=6, color="#aaaaaa")
-        plt.setp(ax1.get_xticklabels(), visible=False)
-        plt.setp(ax2.get_xticklabels(), visible=False)
+    usdt = [t for t in tickers
+            if t.get("symbol","").endswith("USDT")
+            and float(t.get("quoteVolume", 0)) > 30_000_000]
+    usdt.sort(key=lambda x: float(x["quoteVolume"]), reverse=True)
+    scan_syms   = [t["symbol"] for t in usdt[:20]]
+    tickers_map = {t["symbol"]: t for t in usdt}
 
-        plt.tight_layout(rect=[0, 0, 1, 1])
+    results = []
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = {
+            ex.submit(_scan_single, sym, interval, tickers_map, strategy, capital_u): sym
+            for sym in scan_syms
+        }
+        for fut in as_completed(futures):
+            r = fut.result()
+            if r:
+                results.append(r)
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results[:3]
+
+
+# ─── Plotly Interactive Chart ─────────────────────────────────────────────────
+
+def build_plotly_chart(df, symbol):
+    try:
+        df_plot = df.dropna(subset=["rsi","macd"]).tail(100).copy().reset_index(drop=True)
+        if len(df_plot) < 5:
+            return None
+
+        fig = make_subplots(
+            rows=3, cols=1, shared_xaxes=True,
+            vertical_spacing=0.02,
+            row_heights=[0.58, 0.20, 0.22],
+        )
+
+        # ── Candlestick ──
+        fig.add_trace(go.Candlestick(
+            x=df_plot["datetime"],
+            open=df_plot["open"], high=df_plot["high"],
+            low=df_plot["low"],   close=df_plot["close"],
+            name="K线",
+            increasing=dict(line=dict(color="#00d4aa", width=1), fillcolor="#00d4aa"),
+            decreasing=dict(line=dict(color="#ff4757", width=1), fillcolor="#ff4757"),
+        ), row=1, col=1)
+
+        # BB fill between upper and lower
+        fig.add_trace(go.Scatter(
+            x=df_plot["datetime"], y=df_plot["bb_upper"],
+            line=dict(color="rgba(74,158,255,0.4)", width=1, dash="dot"),
+            name="BB上轨", showlegend=False,
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_plot["datetime"], y=df_plot["bb_lower"],
+            line=dict(color="rgba(74,158,255,0.4)", width=1, dash="dot"),
+            fill="tonexty", fillcolor="rgba(74,158,255,0.04)",
+            name="BB区间", showlegend=False,
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_plot["datetime"], y=df_plot["bb_mid"],
+            line=dict(color="rgba(74,158,255,0.25)", width=0.8),
+            name="BB中轨", showlegend=False,
+        ), row=1, col=1)
+
+        fig.add_trace(go.Scatter(
+            x=df_plot["datetime"], y=df_plot["ema20"],
+            line=dict(color="#f5a623", width=1.5), name="EMA20",
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_plot["datetime"], y=df_plot["ema50"],
+            line=dict(color="#a855f7", width=1.5), name="EMA50",
+        ), row=1, col=1)
+
+        # ── Volume ──
+        vol_colors = [
+            "#00d4aa" if df_plot["close"].iloc[i] >= df_plot["open"].iloc[i] else "#ff4757"
+            for i in range(len(df_plot))
+        ]
+        fig.add_trace(go.Bar(
+            x=df_plot["datetime"], y=df_plot["volume"],
+            marker_color=vol_colors, marker_opacity=0.65,
+            name="成交量", showlegend=False,
+        ), row=2, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_plot["datetime"], y=df_plot["vol_ma10"],
+            line=dict(color="#f5a623", width=1),
+            name="VolMA10", showlegend=False,
+        ), row=2, col=1)
+
+        # ── RSI ──
+        fig.add_trace(go.Scatter(
+            x=df_plot["datetime"], y=df_plot["rsi"],
+            line=dict(color="#a855f7", width=1.5),
+            fill="tozeroy", fillcolor="rgba(168,85,247,0.05)",
+            name="RSI", showlegend=False,
+        ), row=3, col=1)
+        fig.add_hrect(y0=70, y1=100, fillcolor="rgba(255,71,87,0.07)", line_width=0, row=3, col=1)
+        fig.add_hrect(y0=0,  y1=30,  fillcolor="rgba(0,212,170,0.07)", line_width=0, row=3, col=1)
+        for level, col in [(70, "#ff4757"), (30, "#00d4aa"), (50, "#333")]:
+            fig.add_hline(y=level, line=dict(color=col, width=0.8, dash="dot"), row=3, col=1)
+
+        last_price = df_plot["close"].iloc[-1]
+        fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="#07070c",
+            plot_bgcolor="#0d0d14",
+            height=500,
+            xaxis_rangeslider_visible=False,
+            font=dict(color="#666", size=10),
+            margin=dict(l=50, r=8, t=40, b=8),
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0,
+                font=dict(size=9, color="#777"), bgcolor="rgba(0,0,0,0)", borderwidth=0,
+            ),
+            title=dict(
+                text=(f"<b><span style='color:white'>{symbol}</span></b>"
+                      f"  <span style='color:#555'>${last_price:,.4f}</span>"),
+                font=dict(size=12), x=0.01, xanchor="left",
+            ),
+            hovermode="x unified",
+            hoverlabel=dict(bgcolor="#111118", font_size=11, bordercolor="rgba(255,255,255,0.1)"),
+        )
+
+        ax = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, zeroline=False)
+        for i in range(1, 4):
+            fig.update_xaxes(**ax, row=i, col=1)
+            fig.update_yaxes(**ax, row=i, col=1)
+        fig.update_yaxes(range=[0, 100], row=3, col=1)
+        fig.update_yaxes(title_text="Price", title_font=dict(size=9, color="#444"), row=1, col=1)
+        fig.update_yaxes(title_text="Vol",   title_font=dict(size=9, color="#444"), row=2, col=1)
+        fig.update_yaxes(title_text="RSI",   title_font=dict(size=9, color="#444"), row=3, col=1)
+
         return fig
     except Exception as e:
         print(f"Chart error: {e}")
         return None
 
-# ─── HTML Builders ────────────────────────────────────────────────────────────
 
-def _fmt(price: float) -> str:
-    if price >= 1000:   return f"${price:,.2f}"
-    if price >= 1:      return f"${price:.4f}"
+# ─── HTML / Card Builders ─────────────────────────────────────────────────────
+
+def _fmt(price):
+    if price >= 1000: return f"${price:,.2f}"
+    if price >= 1:    return f"${price:.4f}"
     return f"${price:.6f}"
 
 
-def card(title: str, body: str, border_color: str = "#333") -> str:
-    return (f'<div style="background:#161b22;border:1px solid {border_color};'
-            f'border-radius:10px;padding:14px;margin:4px;">'
-            f'<div style="font-size:12px;color:#888;margin-bottom:6px">{title}</div>'
-            f'{body}</div>')
+def _glass(title, body, accent="#6c63ff"):
+    return (
+        f'<div style="background:rgba(255,255,255,0.025);'
+        f'border:1px solid rgba(255,255,255,0.07);'
+        f'border-top:2px solid {accent};'
+        f'border-radius:18px;padding:16px 14px;margin:5px 0;">'
+        f'<div style="font-size:10px;color:#555;letter-spacing:1.5px;'
+        f'text-transform:uppercase;margin-bottom:10px;font-weight:500">{title}</div>'
+        f'{body}</div>'
+    )
 
 
-def build_price_html(ticker: dict | None, sig: dict) -> str:
-    price = sig["price"]
-    chg   = float(ticker["priceChangePercent"]) if ticker else 0
-    hi    = float(ticker["highPrice"])          if ticker else 0
-    lo    = float(ticker["lowPrice"])           if ticker else 0
-    chg_color = "#00c851" if chg >= 0 else "#ff4444"
-    body = (f'<div style="font-size:26px;font-weight:bold;color:white">{_fmt(price)}</div>'
-            f'<div style="font-size:16px;color:{chg_color};margin-top:4px">'
-            f'{"▲" if chg >= 0 else "▼"} {chg:+.2f}%</div>'
-            f'<div style="font-size:12px;color:#888;margin-top:4px">'
-            f'高: {_fmt(hi)} &nbsp; 低: {_fmt(lo)}</div>')
-    return card("当前价格", body, "#333")
+def build_auto_recs_html(recs):
+    if not recs:
+        return _glass(
+            "🎯 AI 智能选币推荐",
+            '<div style="color:#555;font-size:13px;padding:14px 0;text-align:center">'
+            '当前市场无强方向信号，建议观望</div>',
+            "#444",
+        )
+
+    medals = ["🥇", "🥈", "🥉"]
+    items  = ""
+    for i, r in enumerate(recs):
+        rgb     = "0,212,170" if r["is_long"] else "255,71,87"
+        accent  = f"rgb({rgb})"
+        dir_txt = "开多 📈" if r["is_long"] else "开空 📉"
+        chg_c   = "#00d4aa" if r["change"] >= 0 else "#ff4757"
+
+        items += (
+            f'<div style="display:flex;align-items:center;gap:12px;'
+            f'padding:12px 14px;margin:6px 0;'
+            f'background:rgba({rgb},0.07);'
+            f'border:1px solid rgba({rgb},0.2);'
+            f'border-radius:14px;">'
+            f'<div style="font-size:26px;flex-shrink:0">{medals[i]}</div>'
+            f'<div style="flex:1;min-width:0">'
+            f'<div style="font-size:17px;font-weight:700;color:white;letter-spacing:0.3px">'
+            f'{r["symbol"]}</div>'
+            f'<div style="font-size:11px;color:#555;margin-top:3px">'
+            f'<span style="color:{chg_c}">{r["change"]:+.2f}%</span>'
+            f'&nbsp;·&nbsp;成交 ${r["vol"]/1e6:.0f}M'
+            f'&nbsp;·&nbsp;置信 {r["confidence"]}%</div>'
+            f'</div>'
+            f'<div style="text-align:right;flex-shrink:0">'
+            f'<div style="font-size:13px;font-weight:700;color:{accent}">{r["signal"]}</div>'
+            f'<div style="font-size:12px;color:{accent};margin-top:3px">{dir_txt}</div>'
+            f'<div style="font-size:11px;color:#444;margin-top:2px">{r["win_rate"]}</div>'
+            f'</div></div>'
+        )
+
+    return _glass("🎯 AI 智能选币推荐", items, "#6c63ff")
 
 
-def build_signal_html(sig: dict) -> str:
-    body = (f'<div style="font-size:24px;font-weight:bold;color:{sig["color"]}">'
-            f'{sig["signal"]}</div>'
-            f'<div style="font-size:13px;color:#ccc;margin-top:6px">'
-            f'{sig["direction"]} &nbsp;|&nbsp; 胜率 {sig["win_rate"]}</div>'
-            f'<div style="font-size:12px;color:#888;margin-top:4px">'
-            f'置信度 {sig["confidence"]}%</div>')
-    return card("交易信号", body, sig["color"])
+def build_price_html(ticker, sig):
+    price     = sig["price"]
+    chg       = float(ticker["priceChangePercent"]) if ticker else 0
+    hi        = float(ticker["highPrice"])           if ticker else 0
+    lo        = float(ticker["lowPrice"])            if ticker else 0
+    chg_color = "#00d4aa" if chg >= 0 else "#ff4757"
+    arrow     = "▲" if chg >= 0 else "▼"
+
+    body = (
+        f'<div style="font-size:28px;font-weight:800;color:white;letter-spacing:-0.5px;line-height:1.1">'
+        f'{_fmt(price)}</div>'
+        f'<div style="font-size:16px;color:{chg_color};margin-top:6px;font-weight:600">'
+        f'{arrow} {chg:+.2f}%</div>'
+        f'<div style="display:flex;gap:14px;margin-top:8px;font-size:11px;color:#444">'
+        f'<span>高&nbsp;<span style="color:#777">{_fmt(hi)}</span></span>'
+        f'<span>低&nbsp;<span style="color:#777">{_fmt(lo)}</span></span>'
+        f'</div>'
+    )
+    return _glass("当前价格", body, "#4a9eff")
 
 
-def build_rec_html(sig: dict, pos: dict, leverage: int) -> str:
-    is_long = sig["is_long"]
-    sl_color = "#ff4444"
-    tp_color = "#00c851"
-    order_hint = sig["order_type"]
+def build_signal_html(sig):
+    s = sig["signal"]
+    if   "强烈买入" in s: color, bg = "#00d4aa", "rgba(0,212,170,0.10)"
+    elif "买入"     in s: color, bg = "#00d4aa", "rgba(0,212,170,0.06)"
+    elif "强烈卖出" in s: color, bg = "#ff4757", "rgba(255,71,87,0.10)"
+    elif "卖出"     in s: color, bg = "#ff4757", "rgba(255,71,87,0.06)"
+    else:                 color, bg = "#ffa502", "rgba(255,165,2,0.06)"
+
+    body = (
+        f'<div style="background:{bg};border-radius:12px;padding:12px;text-align:center">'
+        f'<div style="font-size:19px;font-weight:800;color:{color}">{s}</div>'
+        f'<div style="font-size:13px;color:{color};margin-top:5px;opacity:0.85">'
+        f'{sig["direction"]}</div>'
+        f'<div style="font-size:11px;color:#444;margin-top:4px">'
+        f'胜率 {sig["win_rate"]} · 置信 {sig["confidence"]}%</div>'
+        f'</div>'
+    )
+    return _glass("交易信号", body, color)
+
+
+def build_rec_html(sig, pos, leverage):
+    order = sig["order_type"]
     if sig["limit_price"]:
-        order_hint += f" @ {_fmt(sig['limit_price'])}"
+        order += f' @ {_fmt(sig["limit_price"])}'
 
-    body = (
-        f'<table style="width:100%;border-collapse:collapse;font-size:13px;color:#ddd">'
-        f'<tr><td style="padding:4px 0;color:#888">📌 入场方式</td>'
-        f'<td style="padding:4px 0;font-weight:bold">{order_hint}</td></tr>'
-        f'<tr><td style="padding:4px 0;color:#888">💰 建议仓位</td>'
-        f'<td style="padding:4px 0"><b>{pos["open_u"]}U</b>'
-        f'（{leverage}倍杠杆 = {pos["nominal_u"]:.0f}U 名义价值）</td></tr>'
-        f'<tr><td style="padding:4px 0;color:{sl_color}">🛡 止损价</td>'
-        f'<td style="padding:4px 0"><b>{_fmt(sig["stop_loss"])}</b>'
-        f'（预计亏损 -{pos["loss_u"]}U）</td></tr>'
-        f'<tr><td style="padding:4px 0;color:{tp_color}">🎯 止盈价</td>'
-        f'<td style="padding:4px 0"><b>{_fmt(sig["take_profit"])}</b>'
-        f'（预计盈利 +{pos["profit_u"]}U）</td></tr>'
-        f'<tr><td style="padding:4px 0;color:#888">⚡ 杠杆建议</td>'
-        f'<td style="padding:4px 0"><b>{leverage}倍</b>'
-        f'（新手建议 ≤ 3倍）</td></tr>'
-        f'</table>'
+    def _row(icon, label, val, col="#ccc"):
+        return (f'<tr><td style="padding:6px 0;color:#555;white-space:nowrap;font-size:12px">'
+                f'{icon}&nbsp;{label}</td>'
+                f'<td style="padding:6px 0 6px 10px;color:{col};font-weight:600;font-size:12px">'
+                f'{val}</td></tr>')
+
+    table = (
+        '<table style="width:100%;border-collapse:collapse">'
+        + _row("📌", "入场方式", order)
+        + _row("💰", "建议仓位", f'{pos["open_u"]}U（×{leverage} = {pos["nominal_u"]:.0f}U）')
+        + _row("🛡", "止损价",   f'{_fmt(sig["stop_loss"])}（−{pos["loss_u"]}U）', "#ff4757")
+        + _row("🎯", "止盈价",   f'{_fmt(sig["take_profit"])}（+{pos["profit_u"]}U）', "#00d4aa")
+        + _row("⚡", "杠杆建议", f'{leverage}倍（新手建议 ≤ 3倍）')
+        + "</table>"
     )
-    return card("操作建议", body, "#4a90d9")
+    return _glass("操作建议", table, "#6c63ff")
 
 
-def build_indicators_html(sig: dict, sentiment: dict) -> str:
+def build_indicators_html(sig, sentiment):
     rsi = sig["rsi"]
-    rsi_color = "#ff4444" if rsi > 70 else ("#00c851" if rsi < 30 else "#ffab00")
-    rsi_label = "超买" if rsi > 70 else ("超卖" if rsi < 30 else "中性")
-    macd_color = "#00c851" if sig["macd_hist"] > 0 else "#ff4444"
-    macd_label = "多头" if sig["macd_hist"] > 0 else "空头"
-    ema_color  = "#00c851" if sig["ema20"] > sig["ema50"] else "#ff4444"
-    ema_label  = "多头排列" if sig["ema20"] > sig["ema50"] else "空头排列"
+    rc  = "#ff4757" if rsi > 70 else ("#00d4aa" if rsi < 30 else "#ffa502")
+    rl  = "超买" if rsi > 70 else ("超卖" if rsi < 30 else "中性")
+    mc  = "#00d4aa" if sig["macd_hist"] > 0 else "#ff4757"
+    ml  = "多头" if sig["macd_hist"] > 0 else "空头"
+    ec  = "#00d4aa" if sig["ema20"] > sig["ema50"] else "#ff4757"
+    el  = "多头排列" if sig["ema20"] > sig["ema50"] else "空头排列"
+
+    def mini(lbl, val, sub, c):
+        return (
+            f'<div style="flex:1;min-width:60px;background:rgba(255,255,255,0.03);'
+            f'border-radius:12px;padding:10px 6px;text-align:center">'
+            f'<div style="font-size:9px;color:#444;margin-bottom:4px;letter-spacing:0.5px">{lbl}</div>'
+            f'<div style="font-size:16px;font-weight:700;color:{c}">{val}</div>'
+            f'<div style="font-size:9px;color:{c};margin-top:3px;opacity:0.75">{sub}</div>'
+            f'</div>'
+        )
+
+    fg_col = "#00d4aa" if sentiment["fg_val"] < 40 else ("#ff4757" if sentiment["fg_val"] > 60 else "#ffa502")
 
     body = (
-        f'<div style="display:flex;flex-wrap:wrap;gap:8px">'
-        f'<div style="flex:1;min-width:120px;background:#1a1a2e;border-radius:8px;padding:10px">'
-        f'<div style="font-size:11px;color:#888">RSI(14)</div>'
-        f'<div style="font-size:18px;font-weight:bold;color:{rsi_color}">{rsi:.1f}</div>'
-        f'<div style="font-size:11px;color:{rsi_color}">{rsi_label}</div></div>'
-        f'<div style="flex:1;min-width:120px;background:#1a1a2e;border-radius:8px;padding:10px">'
-        f'<div style="font-size:11px;color:#888">MACD柱</div>'
-        f'<div style="font-size:18px;font-weight:bold;color:{macd_color}">'
-        f'{sig["macd_hist"]:+.5f}</div>'
-        f'<div style="font-size:11px;color:{macd_color}">{macd_label}</div></div>'
-        f'<div style="flex:1;min-width:120px;background:#1a1a2e;border-radius:8px;padding:10px">'
-        f'<div style="font-size:11px;color:#888">均线趋势</div>'
-        f'<div style="font-size:14px;font-weight:bold;color:{ema_color}">{ema_label}</div>'
-        f'<div style="font-size:11px;color:#888">波动率 {sig["atr_pct"]:.2f}%</div></div>'
-        f'<div style="flex:1;min-width:120px;background:#1a1a2e;border-radius:8px;padding:10px">'
-        f'<div style="font-size:11px;color:#888">市场情绪</div>'
-        f'<div style="font-size:14px;font-weight:bold;color:#ffab00">{sentiment["overall"]}</div>'
-        f'<div style="font-size:11px;color:#888">恐惧贪婪 {sentiment["fg_val"]}</div></div>'
-        f'</div>'
+        f'<div style="display:flex;gap:5px;flex-wrap:nowrap">'
+        + mini("RSI(14)",  f'{rsi:.0f}',  rl, rc)
+        + mini("MACD",     ml,            f'{sig["macd_hist"]:+.4f}'[:7], mc)
+        + mini("均线",     el[:2],        el[2:], ec)
+        + mini("波动率",   f'{sig["atr_pct"]:.1f}%', "ATR", "#777")
+        + mini("恐惧贪婪", str(sentiment["fg_val"]), sentiment["fg_label"][:2], fg_col)
+        + "</div>"
     )
-    return card("技术指标 & 市场情绪", body, "#333")
+    return _glass("技术指标 & 情绪速览", body, "#333")
 
 
-def build_sentiment_html(sentiment: dict) -> str:
-    fg = sentiment["fg_val"]
-    bar_color = "#00c851" if fg < 40 else ("#ff4444" if fg > 60 else "#ffab00")
+def build_sentiment_html(sentiment):
+    fg      = sentiment["fg_val"]
+    bar_col = "#00d4aa" if fg < 40 else ("#ff4757" if fg > 60 else "#ffa502")
+
     body = (
-        f'<div style="margin-bottom:8px;font-size:13px;color:#ccc">'
-        f'<b>恐惧贪婪指数：</b> '
-        f'<span style="color:{bar_color};font-size:18px;font-weight:bold">{fg}</span>'
-        f' / 100 — {sentiment["fg_label"]}</div>'
-        f'<div style="background:#333;border-radius:4px;height:8px;margin-bottom:10px">'
-        f'<div style="background:{bar_color};width:{fg}%;height:100%;border-radius:4px"></div>'
+        f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+        f'<span style="font-size:28px;font-weight:800;color:{bar_col}">{fg}</span>'
+        f'<div><div style="font-size:13px;color:{bar_col};font-weight:600">'
+        f'{sentiment["fg_label"]}</div>'
+        f'<div style="font-size:10px;color:#444">恐惧贪婪指数 / 100</div></div></div>'
+        f'<div style="background:#111;border-radius:6px;height:5px;margin-bottom:12px;overflow:hidden">'
+        f'<div style="background:{bar_col};width:{fg}%;height:100%;border-radius:6px"></div></div>'
+        f'<div style="font-size:11px;color:#555;line-height:2">'
+        f'资金费率：<span style="color:#888">{sentiment["fr_label"]}</span><br>'
+        f'多空比：<span style="color:#888">{sentiment["lsr_label"]}</span><br>'
+        f'综合情绪：<span style="color:#ffa502;font-weight:600">{sentiment["overall"]}</span>'
         f'</div>'
-        f'<div style="font-size:12px;color:#aaa;line-height:1.8">'
-        f'资金费率：{sentiment["fr_label"]}<br>'
-        f'多空持仓比：{sentiment["lsr_label"]}<br>'
-        f'综合情绪判断：<b style="color:#ffab00">{sentiment["overall"]}</b></div>'
     )
-    return card("市场情绪分析", body, "#333")
+    return _glass("市场情绪", body, bar_col)
 
 
-def build_scan_html(market: dict) -> str:
-    def rows(coins, key="symbol"):
-        if not coins:
-            return "<tr><td colspan='3' style='color:#888;padding:4px'>暂无数据</td></tr>"
-        out = ""
-        for c in coins:
-            color = "#00c851" if c["change"] >= 0 else "#ff4444"
-            out += (f'<tr><td style="padding:3px 6px;color:white">{c["symbol"]}</td>'
-                    f'<td style="padding:3px 6px;color:{color}">{c["change"]:+.2f}%</td>'
-                    f'<td style="padding:3px 6px;color:#aaa">${c["volume"]/1e6:.0f}M</td></tr>')
-        return out
-
-    table_style = 'style="width:100%;border-collapse:collapse;font-size:12px"'
-    head = ('<tr style="color:#888;border-bottom:1px solid #333">'
-            '<th style="padding:4px 6px;text-align:left">币种</th>'
-            '<th style="padding:4px 6px;text-align:left">涨跌</th>'
-            '<th style="padding:4px 6px;text-align:left">成交量</th></tr>')
-
+def build_scan_html(market):
     def section(title, coins):
-        return (f'<div style="flex:1;min-width:200px">'
-                f'<div style="font-size:12px;color:#888;margin-bottom:6px">{title}</div>'
-                f'<table {table_style}>{head}{rows(coins)}</table></div>')
+        rows = ""
+        for c in coins:
+            cc = "#00d4aa" if c["change"] >= 0 else "#ff4757"
+            rows += (
+                f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">'
+                f'<td style="padding:5px 0;color:#ccc;font-size:12px;font-weight:500">'
+                f'{c["symbol"]}</td>'
+                f'<td style="padding:5px 0;color:{cc};font-size:12px;text-align:right">'
+                f'{c["change"]:+.2f}%</td>'
+                f'<td style="padding:5px 0;color:#444;font-size:11px;text-align:right">'
+                f'${c["volume"]/1e6:.0f}M</td></tr>'
+            )
+        if not rows:
+            rows = '<tr><td colspan="3" style="color:#444;padding:5px 0;font-size:11px">暂无</td></tr>'
+        return (
+            f'<div style="flex:1;min-width:130px">'
+            f'<div style="font-size:10px;color:#444;margin-bottom:6px;letter-spacing:0.5px">{title}</div>'
+            f'<table style="width:100%;border-collapse:collapse">{rows}</table></div>'
+        )
 
-    body = (f'<div style="display:flex;flex-wrap:wrap;gap:12px">'
-            f'{section("🔥 热门榜", market["热门榜"])}'
-            f'{section("📈 涨幅榜", market["涨幅榜"])}'
-            f'{section("📉 跌幅榜", market["跌幅榜"])}'
-            f'{section("⚡ 快进快出", market["快进快出榜"])}'
-            f'</div>')
-    return card("市场扫描", body, "#333")
+    body = (
+        f'<div style="display:flex;flex-wrap:wrap;gap:16px">'
+        + section("🔥 热门", market["热门榜"])
+        + section("📈 涨幅", market["涨幅榜"])
+        + section("📉 跌幅", market["跌幅榜"])
+        + section("⚡ 快进快出", market["快进快出榜"])
+        + "</div>"
+    )
+    return _glass("市场扫描总览", body, "#333")
 
 
-def build_ai_html(ai_text: str) -> str:
-    body = f'<div style="font-size:13px;color:#ddd;line-height:1.8;white-space:pre-wrap">{ai_text}</div>'
-    return card("🤖 AI 综合分析（DeepSeek）", body, "#7c3aed")
+def build_ai_html(ai_text):
+    body = (
+        f'<div style="font-size:13px;color:#bbb;line-height:1.9;white-space:pre-wrap">'
+        f'{ai_text}</div>'
+    )
+    return _glass("🤖 DeepSeek AI 综合分析", body, "#7c3aed")
 
-# ─── Main Orchestrator ────────────────────────────────────────────────────────
 
-def run_analysis(symbol: str, timeframe_label: str,
-                 capital_u: float, strategy: str) -> tuple:
+# ─── Orchestrators ────────────────────────────────────────────────────────────
+
+def run_auto_select(capital_u, strategy, timeframe_label):
+    interval  = TIMEFRAME_MAP.get(timeframe_label, "1h")
+    recs      = auto_select_coin(float(capital_u), strategy, interval)
+    recs_html = build_auto_recs_html(recs)
+    best      = recs[0]["symbol"] if recs else "BTCUSDT"
+    return recs_html, best
+
+
+def run_analysis(selected_coin, timeframe_label, capital_u, strategy):
     interval = TIMEFRAME_MAP.get(timeframe_label, "1h")
-    timestamp = f"⏱ 分析时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    symbol   = (selected_coin or "BTCUSDT").strip().upper()
+    ts       = (f'<div style="font-size:10px;color:#333;padding:3px 2px">'
+                f'⏱ {symbol} · {datetime.now().strftime("%H:%M:%S")} · Binance</div>')
+
+    def _err(msg):
+        e = f'<div style="color:#ff4757;font-size:13px;padding:10px">{msg}</div>'
+        return e, e, e, e, e, None, e, e, ts
 
     df = fetch_klines(symbol, interval)
     if df is None or len(df) < 60:
-        err = '<div style="color:#ff4444;padding:20px">数据获取失败，请检查网络连接或稍后重试</div>'
-        empty_fig = None
-        return err, err, err, err, err, empty_fig, err, timestamp
+        return _err(f"❌ 数据获取失败（{symbol}），请检查网络或稍后重试")
 
-    df = add_indicators(df)
-    sig = generate_signal(df)
-    leverage = recommend_leverage(sig)
-    pos = calc_position(capital_u, sig, leverage)
-    ticker = fetch_ticker_24h(symbol)
+    df        = add_indicators(df)
+    sig       = generate_signal(df)
+    leverage  = recommend_leverage(sig)
+    pos       = calc_position(float(capital_u), sig, leverage)
+    ticker    = fetch_ticker_24h(symbol)
     sentiment = fetch_sentiment(symbol)
-    market = scan_market(strategy)
-    ai_text = ai_analyze(symbol, sig, sentiment, capital_u, strategy)
-    chart = build_chart(df, symbol)
+    market    = scan_market(strategy)
+    ai_text   = ai_analyze(symbol, sig, sentiment, float(capital_u), strategy)
+    chart     = build_plotly_chart(df, symbol)
 
-    price_html   = build_price_html(ticker, sig)
-    signal_html  = build_signal_html(sig)
-    rec_html     = build_rec_html(sig, pos, leverage)
-    indic_html   = build_indicators_html(sig, sentiment)
-    sent_html    = build_sentiment_html(sentiment)
-    scan_html    = build_scan_html(market)
-    ai_html      = build_ai_html(ai_text)
+    return (
+        build_price_html(ticker, sig),
+        build_signal_html(sig),
+        build_rec_html(sig, pos, leverage),
+        build_indicators_html(sig, sentiment),
+        build_sentiment_html(sentiment),
+        chart,
+        build_scan_html(market),
+        build_ai_html(ai_text),
+        ts,
+    )
 
-    return (price_html, signal_html, rec_html, indic_html,
-            sent_html, chart, scan_html, ai_html, timestamp)
 
 # ─── Gradio UI ────────────────────────────────────────────────────────────────
 
-RISK_WARNING = """<div style="background:#1a0a0a;border:1px solid #cc0000;border-radius:8px;
-padding:12px;margin-bottom:12px;font-size:12px;color:#ffaaaa">
-⚠️ <b>风险警告</b>：本工具仅供参考，不构成投资建议。加密货币交易有极高风险，
-价格波动剧烈，杠杆交易可能导致超额亏损，您可能损失全部本金。
-请在充分了解风险的前提下，只投入您能承受损失的资金。</div>"""
-
 CSS = """
-.gradio-container { max-width: 100% !important; }
-.main { padding: 8px !important; }
-footer { display: none !important; }
+body, .gradio-container, .app { background:#07070c !important; }
+.main { padding:10px !important; }
+footer, [data-testid="footer"], .built-with { display:none !important; }
+
+.block { background:transparent !important; border:none !important; box-shadow:none !important; }
+.form, .panel, .wrap, .container { background:transparent !important; }
+
+/* Inputs */
+input, select, textarea,
+.svelte-i3tvor input, .svelte-i3tvor select {
+    background:rgba(255,255,255,0.06) !important;
+    border:1px solid rgba(255,255,255,0.1) !important;
+    border-radius:12px !important;
+    color:white !important;
+    font-size:14px !important;
+}
+label span, .svelte-1b6s6s { color:#555 !important; font-size:11px !important; }
+
+/* Primary button — gradient */
+button.primary, button[data-testid="primary"] {
+    background: linear-gradient(135deg, #6c63ff 0%, #a855f7 100%) !important;
+    border:none !important;
+    border-radius:14px !important;
+    font-size:16px !important;
+    font-weight:700 !important;
+    letter-spacing:0.3px !important;
+    box-shadow:0 4px 20px rgba(108,99,255,0.3) !important;
+    transition:all 0.2s ease !important;
+    color:white !important;
+}
+button.primary:active {
+    transform:scale(0.97) !important;
+    box-shadow:0 2px 10px rgba(108,99,255,0.2) !important;
+}
+
+/* Secondary / scan button */
+button.secondary, button[data-testid="secondary"] {
+    background:rgba(255,255,255,0.05) !important;
+    border:1px solid rgba(255,255,255,0.1) !important;
+    border-radius:10px !important;
+    color:#888 !important;
+    font-size:13px !important;
+}
+
+/* Accordion */
+details, .accordion {
+    background:rgba(255,255,255,0.02) !important;
+    border:1px solid rgba(255,255,255,0.06) !important;
+    border-radius:14px !important;
+}
+
+/* Plot bg */
+.plot-container { background:transparent !important; border:none !important; }
 """
 
-with gr.Blocks(title="加密货币智能交易分析器", css=CSS,
-               theme=gr.themes.Base(primary_hue="violet")) as demo:
+THEME = gr.themes.Base(primary_hue=gr.themes.colors.violet).set(
+    body_background_fill="#07070c",
+    body_background_fill_dark="#07070c",
+    background_fill_primary="#0d0d14",
+    background_fill_primary_dark="#0d0d14",
+    background_fill_secondary="#111118",
+    background_fill_secondary_dark="#111118",
+    border_color_primary="rgba(255,255,255,0.08)",
+    border_color_primary_dark="rgba(255,255,255,0.08)",
+    color_accent="#6c63ff",
+    color_accent_soft="rgba(108,99,255,0.15)",
+    color_accent_soft_dark="rgba(108,99,255,0.15)",
+)
 
-    gr.Markdown("# 🚀 加密货币智能交易分析器")
-    gr.HTML(RISK_WARNING)
+HEADER_HTML = """
+<div style="padding:14px 2px 6px">
+  <div style="font-size:21px;font-weight:800;color:white;letter-spacing:-0.5px">
+    🚀 加密货币智能交易分析器
+  </div>
+  <div style="font-size:11px;color:#333;margin-top:3px;letter-spacing:0.5px">
+    实时行情 · 技术指标 · 市场情绪 · DeepSeek AI · Binance
+  </div>
+</div>"""
 
+RISK_HTML = """
+<div style="background:rgba(255,50,50,0.07);border:1px solid rgba(255,50,50,0.18);
+border-radius:12px;padding:9px 14px;margin-bottom:4px;font-size:11px;
+color:#cc6666;line-height:1.5">
+⚠️ <b>风险警告</b>：本工具仅供参考，不构成投资建议。加密货币交易有极高风险，
+杠杆交易可能导致超额亏损，您可能损失全部本金。请只投入您能承受损失的资金。
+</div>"""
+
+with gr.Blocks(title="🚀 加密货币智能交易分析器", css=CSS, theme=THEME) as demo:
+
+    gr.HTML(HEADER_HTML)
+    gr.HTML(RISK_HTML)
+
+    # ── AI auto-recommendations (updated by scan) ──
+    html_recs     = gr.HTML()
+    selected_coin = gr.Textbox(value="BTCUSDT", visible=False, label="分析币种")
+
+    # ── Settings row ──
     with gr.Row():
-        dd_symbol = gr.Dropdown(
-            choices=POPULAR_PAIRS, value="BTCUSDT",
-            label="选择交易对", scale=3
+        num_capital = gr.Number(value=100, label="本金 USDT", minimum=10, scale=2)
+        dd_strategy = gr.Dropdown(
+            choices=["快进快出", "趋势交易"], value="快进快出",
+            label="策略", scale=2,
         )
         dd_tf = gr.Dropdown(
             choices=list(TIMEFRAME_MAP.keys()), value="1小时",
-            label="时间周期", scale=2
+            label="时间周期", scale=2,
         )
-        num_capital = gr.Number(value=100, label="本金（USDT）", minimum=10, scale=2)
-        dd_strategy = gr.Dropdown(
-            choices=["快进快出", "趋势交易"], value="快进快出",
-            label="策略类型", scale=2
-        )
+        btn_scan = gr.Button("🔄 重新扫描", scale=1, size="sm", variant="secondary")
 
-    btn = gr.Button("🔍 开始分析", variant="primary", size="lg")
-    ts_md = gr.Markdown("等待分析...")
+    with gr.Accordion("📌 手动指定币种（可选，覆盖AI推荐）", open=False):
+        with gr.Row():
+            dd_symbol      = gr.Dropdown(choices=POPULAR_PAIRS, value="BTCUSDT",
+                                         label="交易对", scale=5)
+            btn_use_manual = gr.Button("用此币分析 →", variant="secondary", scale=1, size="sm")
 
-    with gr.Row():
-        html_price  = gr.HTML()
-        html_signal = gr.HTML()
-        html_rec    = gr.HTML()
+    btn_analyze = gr.Button("🚀 深度分析", variant="primary", size="lg")
+    ts_html     = gr.HTML()
+
+    # ── Results ──
+    with gr.Row(equal_height=True):
+        html_price  = gr.HTML(scale=1)
+        html_signal = gr.HTML(scale=1)
+        html_rec    = gr.HTML(scale=2)
 
     html_indic = gr.HTML()
     html_sent  = gr.HTML()
-    plot_chart = gr.Plot(label="K线图表")
+    plot_chart = gr.Plot(label="", show_label=False)
     html_scan  = gr.HTML()
     html_ai    = gr.HTML()
 
-    inputs  = [dd_symbol, dd_tf, num_capital, dd_strategy]
-    outputs = [html_price, html_signal, html_rec, html_indic,
-               html_sent, plot_chart, html_scan, html_ai, ts_md]
+    # ── Event wiring ──
+    scan_ins  = [num_capital, dd_strategy, dd_tf]
+    scan_outs = [html_recs, selected_coin]
 
-    btn.click(fn=run_analysis, inputs=inputs, outputs=outputs)
-    demo.load(fn=run_analysis, inputs=inputs, outputs=outputs)
+    ana_ins  = [selected_coin, dd_tf, num_capital, dd_strategy]
+    ana_outs = [html_price, html_signal, html_rec, html_indic,
+                html_sent, plot_chart, html_scan, html_ai, ts_html]
 
+    btn_scan.click(fn=run_auto_select, inputs=scan_ins, outputs=scan_outs)
+    btn_use_manual.click(fn=lambda s: s, inputs=[dd_symbol], outputs=[selected_coin])
+    btn_analyze.click(fn=run_analysis, inputs=ana_ins, outputs=ana_outs)
+
+    # Page load: scan first, then analyze top pick
+    demo.load(fn=run_auto_select, inputs=scan_ins, outputs=scan_outs).then(
+        fn=run_analysis, inputs=ana_ins, outputs=ana_outs,
+    )
+
+    # Auto-refresh every 90 seconds
     try:
-        timer = gr.Timer(value=60)
-        timer.tick(fn=run_analysis, inputs=inputs, outputs=outputs)
+        timer = gr.Timer(value=90)
+        timer.tick(fn=run_auto_select, inputs=scan_ins, outputs=scan_outs).then(
+            fn=run_analysis, inputs=ana_ins, outputs=ana_outs,
+        )
     except Exception:
-        gr.HTML("""<script>
-        setInterval(function(){
-            var b=document.querySelector('button.lg');
-            if(b) b.click();
-        }, 60000);
-        </script>""")
+        pass
+
 
 if __name__ == "__main__":
-    # share=True 在本机/服务器上创建公网链接
-    # 在 Replit / HF Spaces 上设为 False（平台自动提供 URL）
-    _share = os.environ.get("GRADIO_SHARE", "true").lower() == "true"
+    _share = os.environ.get("GRADIO_SHARE", "false").lower() == "true"
     _port  = int(os.environ.get("GRADIO_SERVER_PORT", "7861"))
     demo.queue().launch(
         server_name="0.0.0.0",
