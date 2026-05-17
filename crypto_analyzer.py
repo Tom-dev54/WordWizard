@@ -867,7 +867,7 @@ def build_ai_html(ai_text):
         f'<div style="font-size:13px;color:#bbb;line-height:1.9;white-space:pre-wrap">'
         f'{ai_text}</div>'
     )
-    return _glass("🤖 DeepSeek AI 综合分析", body, "#7c3aed")
+    return _glass("🤖 AI 智能分析引擎", body, "#7c3aed")
 
 
 # ─── Orchestrators ────────────────────────────────────────────────────────────
@@ -995,7 +995,7 @@ HEADER_HTML = """
     🚀 加密货币智能交易分析器
   </div>
   <div style="font-size:11px;color:#333;margin-top:3px;letter-spacing:0.5px">
-    实时行情 · 技术指标 · 市场情绪 · DeepSeek AI · Binance
+    实时行情 · 技术指标 · 市场情绪 · AI 智能分析 · Binance
   </div>
 </div>"""
 
