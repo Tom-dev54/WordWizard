@@ -1,0 +1,20 @@
+{
+  "name": "月相塔罗 · Lunaria Tarot",
+  "short_name": "Lunaria",
+  "description": "塔罗占卜 · 星座解读 · 八字速览",
+  "start_url": "/WordWizard/",
+  "scope": "/WordWizard/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2d2618",
+  "theme_color": "#faf4e8",
+  "icons": [
+    {
+      "src": "/WordWizard/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "entertainment"]
+}
