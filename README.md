@@ -1,26 +1,47 @@
-# 加密货币智能交易分析器
+# Crypto Analyzer
 
-实时行情 + 技术指标 + 市场情绪 + DeepSeek AI 综合分析。
-
-## 在 Replit 上运行
-
-1. 点击右上角 **Run** 按钮，等待依赖安装（约1分钟）
-2. 左侧 🔒 **Secrets** 添加：
-   - Key: `DEEPSEEK_API_KEY`，Value: 你的 DeepSeek API Key
-3. 顶部 webview 出现后点击链接，手机浏览器可直接访问
+加密货币智能交易分析器，使用 Gradio 提供 Web 界面，结合实时行情、技术指标、市场情绪和 DeepSeek AI 生成分析结果。
 
 ## 功能
-- 自动扫描市场：热门榜 / 涨幅榜 / 跌幅榜 / 快进快出榜
-- 技术指标：RSI、MACD、布林带、EMA20/50、ATR
-- 市场情绪：恐惧贪婪指数、资金费率、多空比
-- AI 综合分析：DeepSeek 给出开多/开空/杠杆/止损止盈建议
+
+- 自动扫描热门榜、涨幅榜、跌幅榜、快进快出榜
+- 计算 RSI、MACD、布林带、EMA20/50、ATR 等技术指标
+- 获取恐惧贪婪指数、资金费率、多空比
+- 使用 DeepSeek API 输出开多/开空、杠杆、止损止盈等建议
 - 根据本金自动计算仓位
 
-## 关于 AI 接入
-使用 **DeepSeek API**（兼容 OpenAI SDK，与 SparkAI 无关）。
-`from openai import OpenAI` + `base_url="https://api.deepseek.com"` 是 DeepSeek 标准接入方式。
+## 运行
 
-## 注意
-word.py 是另一个独立项目，不会被运行（Replit 只执行 `.replit` 里指定的 crypto_analyzer.py）。
+1. 安装依赖：
 
-⚠️ 仅供参考，不构成投资建议。加密货币有极高风险。
+```bash
+pip install -r requirements.txt
+```
+
+2. 配置 DeepSeek API Key：
+
+```bash
+copy .env.example .env
+```
+
+然后在 `.env` 中填写：
+
+```text
+DEEPSEEK_API_KEY=your_deepseek_api_key
+```
+
+3. 启动：
+
+```bash
+python crypto_analyzer.py
+```
+
+Replit 环境会按 `.replit` 配置自动启动 `crypto_analyzer.py`。
+
+## 项目拆分说明
+
+原仓库里的背单词工具 `word.py` 已拆分到独立仓库 `WordWizard-Vocabulary`，本仓库只保留加密货币分析器，避免两个项目混在一起。
+
+## 风险提示
+
+本工具仅供学习和研究使用，不构成投资建议。加密货币波动极高，请自行控制风险。
